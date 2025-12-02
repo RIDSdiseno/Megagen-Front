@@ -1,5 +1,5 @@
 import { NavLink } from "react-router-dom";
-import Logo from "/logo.jpg";
+import Logo from "/LogoLogin.jpg";
 import { 
   LayoutDashboard, 
   Users, 
