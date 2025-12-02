@@ -1,7 +1,6 @@
 import MainLayout from "../components/MainLayout";
 import CountUp from "react-countup";
 import {
-  TrendingUp,
   Target,
   Clock3,
   ArrowUpRight,
@@ -229,7 +228,7 @@ export default function DashboardHome() {
               </tr>
             </thead>
             <tbody>
-              {oportunidades.map((op, idx) => (
+              {oportunidades.map((op) => (
                 <tr key={op.cliente} className="border-t border-gray-200 hover:bg-gray-50 transition">
                   <td className="py-3 px-4 font-semibold text-gray-800">{op.cliente}</td>
                   <td className="py-3 px-4 text-sm text-gray-700">{op.etapa}</td>

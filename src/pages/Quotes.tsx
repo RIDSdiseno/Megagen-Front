@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import MainLayout from "../components/MainLayout";
 import Modal from "../components/Modal";
-import { FileText, CalendarClock, FolderKanban, ArrowRight, CheckCircle, Clock3 } from "lucide-react";
+import { FileText, FolderKanban, ArrowRight, CheckCircle, Clock3 } from "lucide-react";
 
 type Etapa = "Cotizacion confirmada" | "Despacho" | "Transito" | "Entregado";
 
 type Cotizacion = {
   id: number;
+  codigo: string;
   cliente: string;
   fecha: string;
   total: string;
@@ -25,6 +26,7 @@ const etapasOrden: Etapa[] = ["Cotizacion confirmada", "Despacho", "Transito", "
 const cotizacionesData: Cotizacion[] = [
   {
     id: 101,
+    codigo: "COT-101",
     cliente: "Clinica Smile",
     fecha: "2025-12-01",
     total: "$2.450.000",
@@ -42,6 +44,7 @@ const cotizacionesData: Cotizacion[] = [
   },
   {
     id: 205,
+    codigo: "COT-205",
     cliente: "Dr. Perez",
     fecha: "2025-12-02",
     total: "$1.180.000",
@@ -58,6 +61,7 @@ const cotizacionesData: Cotizacion[] = [
   },
   {
     id: 309,
+    codigo: "COT-309",
     cliente: "SmileLab",
     fecha: "2025-12-03",
     total: "$3.050.000",

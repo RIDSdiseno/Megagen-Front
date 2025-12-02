@@ -1,7 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import MainLayout from "../components/MainLayout";
 import {
-  Users,
   Search,
   UserPlus,
   ShieldCheck,
