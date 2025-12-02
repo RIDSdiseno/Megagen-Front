@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import LogoLogin from "../assets/LogoLogin.png";
+import LogoLogin from "../../public/LogoLogin.jpg";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
