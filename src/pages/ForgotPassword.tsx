@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft } from "lucide-react";
-import LogoLogin from "../assets/LogoLogin.png";
+import LogoLogin from "../assets/logoLogin.png";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
