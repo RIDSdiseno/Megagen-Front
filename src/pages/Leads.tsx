@@ -56,17 +56,27 @@ const leadsData: Lead[] = [
 export default function Leads() {
   const [search, setSearch] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<Lead["estado"] | "Todos">("Todos");
+  const [leads, setLeads] = useState<Lead[]>(leadsData);
+  const [showForm, setShowForm] = useState(false);
+  const [nuevo, setNuevo] = useState<Omit<Lead, "id">>({
+    nombre: "",
+    telefono: "",
+    correo: "",
+    estado: "Nuevo",
+    fechaIngreso: new Date().toISOString().slice(0, 10),
+    proximoPaso: "",
+  });
 
   const resumen = useMemo(
     () => estadoOrden.map(estado => ({
       estado,
-      total: leadsData.filter(l => l.estado === estado).length
+      total: leads.filter(l => l.estado === estado).length
     })),
-    []
+    [leads]
   );
 
   const filtered = useMemo(() => {
-    return leadsData.filter(l => {
+    return leads.filter(l => {
       const term = search.toLowerCase();
       const matchTexto =
         l.nombre.toLowerCase().includes(term) ||
@@ -90,6 +100,21 @@ export default function Leads() {
     window.open(`mailto:${correo}`);
   };
 
+  const handleCrear = () => {
+    if (!nuevo.nombre || !nuevo.telefono) return;
+    const id = leads.length ? Math.max(...leads.map(l => l.id)) + 1 : 1;
+    setLeads([{ id, ...nuevo }, ...leads]);
+    setShowForm(false);
+    setNuevo({
+      nombre: "",
+      telefono: "",
+      correo: "",
+      estado: "Nuevo",
+      fechaIngreso: new Date().toISOString().slice(0, 10),
+      proximoPaso: "",
+    });
+  };
+
   return (
     <MainLayout>
       <div className="flex flex-col gap-4 mb-6">
@@ -99,7 +124,10 @@ export default function Leads() {
             <h2 className="text-3xl font-extrabold text-[#1A334B]">Leads / Clientes</h2>
             <p className="text-gray-600 text-sm">Comunicate por mensaje, correo o llamada y da seguimiento rapido.</p>
           </div>
-          <button className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5">
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+          >
             <UserPlus size={18} />
             Nuevo cliente
           </button>
@@ -198,7 +226,80 @@ export default function Leads() {
           </div>
         ))}
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[#1A334B]">Nuevo cliente</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input label="Nombre" value={nuevo.nombre} onChange={(v) => setNuevo({ ...nuevo, nombre: v })} />
+              <Input label="Correo" value={nuevo.correo} onChange={(v) => setNuevo({ ...nuevo, correo: v })} />
+              <Input label="Teléfono" value={nuevo.telefono} onChange={(v) => setNuevo({ ...nuevo, telefono: v })} />
+              <Input label="Próximo paso" value={nuevo.proximoPaso} onChange={(v) => setNuevo({ ...nuevo, proximoPaso: v })} />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-[#1A334B]">Estado</span>
+                <select
+                  className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
+                  value={nuevo.estado}
+                  onChange={(e) => setNuevo({ ...nuevo, estado: e.target.value as Lead["estado"] })}
+                >
+                  {estadoOrden.map((estado) => (
+                    <option key={estado} value={estado}>{estado}</option>
+                  ))}
+                </select>
+              </div>
+              <Input
+                label="Fecha ingreso"
+                type="date"
+                value={nuevo.fechaIngreso}
+                onChange={(v) => setNuevo({ ...nuevo, fechaIngreso: v })}
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCrear}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
+              >
+                Guardar cliente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-[#1A334B]">
+      <span className="font-semibold">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+      />
+    </label>
   );
 }
 

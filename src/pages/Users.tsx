@@ -6,7 +6,6 @@ import {
   UserPlus,
   ShieldCheck,
   Ban,
-  Mail,
   CheckCircle,
 } from "lucide-react";
 
@@ -37,6 +36,14 @@ export default function UsuariosPage() {
   const [filtroRol, setFiltroRol] = useState<Rol | "Todos">("Todos");
   const [filtroEstado, setFiltroEstado] = useState<Estado | "Todos">("Todos");
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosData);
+  const [showForm, setShowForm] = useState(false);
+  const [nuevo, setNuevo] = useState<Omit<Usuario, "id">>({
+    nombre: "",
+    correo: "",
+    rol: "Ventas",
+    estado: "Pendiente",
+    ultimoAcceso: "Pendiente",
+  });
 
   const resumen = useMemo(
     () => ({
@@ -62,6 +69,28 @@ export default function UsuariosPage() {
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, estado: nuevo } : u)));
   };
 
+  const cambiarRol = (id: number, nuevoRol: Rol) => {
+    setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol: nuevoRol } : u)));
+  };
+
+  const eliminarUsuario = (id: number) => {
+    setUsuarios((prev) => prev.filter((u) => u.id !== id));
+  };
+
+  const handleCrear = () => {
+    if (!nuevo.nombre || !nuevo.correo) return;
+    const id = usuarios.length ? Math.max(...usuarios.map((u) => u.id)) + 1 : 1;
+    setUsuarios([{ id, ...nuevo }, ...usuarios]);
+    setShowForm(false);
+    setNuevo({
+      nombre: "",
+      correo: "",
+      rol: "Ventas",
+      estado: "Pendiente",
+      ultimoAcceso: "Pendiente",
+    });
+  };
+
   return (
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
@@ -70,7 +99,10 @@ export default function UsuariosPage() {
           <h2 className="text-3xl font-extrabold text-[#1A334B]">Usuarios y permisos</h2>
           <p className="text-gray-600 text-sm">Gestiona cuentas, roles y accesos rapidamente.</p>
         </div>
-        <button className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5">
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+        >
           <UserPlus size={18} />
           Invitar usuario
         </button>
@@ -119,21 +151,23 @@ export default function UsuariosPage() {
                   <p className="font-semibold text-gray-800">{u.nombre}</p>
                   <p className="text-xs text-gray-500">{u.correo}</p>
                 </td>
-                <td className="py-3 px-4 text-sm text-gray-700">{u.rol}</td>
+                <td className="py-3 px-4 text-sm text-gray-700">
+                  <select
+                    className="border border-[#D9E7F5] rounded-lg px-2 py-1 text-sm"
+                    value={u.rol}
+                    onChange={(e) => cambiarRol(u.id, e.target.value as Rol)}
+                  >
+                    {roles.map((rol) => (
+                      <option key={rol} value={rol}>{rol}</option>
+                    ))}
+                  </select>
+                </td>
                 <td className="py-3 px-4">
                   <EstadoPill estado={u.estado} />
                 </td>
                 <td className="py-3 px-4 text-sm text-gray-700">{u.ultimoAcceso}</td>
                 <td className="py-3 px-4">
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {u.estado === "Pendiente" && (
-                      <BotonAccion
-                        label="Reenviar"
-                        color="text-[#1A6CD3] bg-[#E6F0FB] hover:bg-[#d9e8ff]"
-                        icon={<Mail size={14} />}
-                        onClick={() => {}}
-                      />
-                    )}
                     {u.estado !== "Activo" && (
                       <BotonAccion
                         label="Activar"
@@ -151,10 +185,10 @@ export default function UsuariosPage() {
                       />
                     )}
                     <BotonAccion
-                      label="Permisos"
+                      label="Eliminar"
                       color="text-[#1A334B] bg-[#F4F8FD] hover:bg-[#e7f0fa]"
                       icon={<ShieldCheck size={14} />}
-                      onClick={() => {}}
+                      onClick={() => eliminarUsuario(u.id)}
                     />
                   </div>
                 </td>
@@ -163,7 +197,83 @@ export default function UsuariosPage() {
           </tbody>
         </table>
       </div>
+
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-[#1A334B]">Invitar / Crear usuario</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input label="Nombre" value={nuevo.nombre} onChange={(v) => setNuevo({ ...nuevo, nombre: v })} />
+              <Input label="Correo" value={nuevo.correo} onChange={(v) => setNuevo({ ...nuevo, correo: v })} />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-[#1A334B]">Rol</span>
+                <select
+                  className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
+                  value={nuevo.rol}
+                  onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })}
+                >
+                  {roles.map((rol) => (
+                    <option key={rol} value={rol}>{rol}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-[#1A334B]">Estado</span>
+                <select
+                  className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
+                  value={nuevo.estado}
+                  onChange={(e) => setNuevo({ ...nuevo, estado: e.target.value as Estado })}
+                >
+                  {estados.map((estado) => (
+                    <option key={estado} value={estado}>{estado}</option>
+                  ))}
+                </select>
+              </div>
+              <Input label="Último acceso" value={nuevo.ultimoAcceso} onChange={(v) => setNuevo({ ...nuevo, ultimoAcceso: v })} />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCrear}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
+              >
+                Guardar usuario
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-[#1A334B]">
+      <span className="font-semibold">{label}</span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+      />
+    </label>
   );
 }
 
@@ -237,3 +347,4 @@ function BotonAccion({
     </button>
   );
 }
+

@@ -12,6 +12,9 @@ type Cotizacion = {
   total: string;
   etapa: Etapa;
   resumen: string;
+  direccion: string;
+  comentarios: string;
+  imagenUrl?: string;
   archivos: string[];
   historico: { fecha: string; nota: string }[];
   entregaProgramada?: string;
@@ -27,6 +30,9 @@ const cotizacionesData: Cotizacion[] = [
     total: "$2.450.000",
     etapa: "Cotizacion confirmada",
     resumen: "Implantes premium y guia quirurgica personalizada.",
+    direccion: "AV Ramon Picarte 427, Oficina 409, Valdivia",
+    comentarios: "Enviar a la misma direccion de despacho. Contacto: Daniel Carvajal.",
+    imagenUrl: "https://via.placeholder.com/800x1100?text=Cotizacion+Clinica+Smile",
     archivos: ["Cotizacion_101.pdf", "GuiaSmile.stl"],
     historico: [
       { fecha: "2025-12-01 09:00", nota: "Cotizacion enviada" },
@@ -41,6 +47,8 @@ const cotizacionesData: Cotizacion[] = [
     total: "$1.180.000",
     etapa: "Despacho",
     resumen: "Kit de implantes y componentes de laboratorio.",
+    direccion: "Av. America 2280, Conchali, Santiago",
+    comentarios: "Despachar a Matta 22, confirmar recepción.",
     archivos: ["Cotizacion_205.pdf", "OrdenCompra.png"],
     historico: [
       { fecha: "2025-12-02 10:00", nota: "Cotizacion aprobada" },
@@ -55,6 +63,8 @@ const cotizacionesData: Cotizacion[] = [
     total: "$3.050.000",
     etapa: "Transito",
     resumen: "Pedido consolidado de implantes y aditamentos.",
+    direccion: "Av. Providencia 1001, Oficina 1203, Santiago",
+    comentarios: "Registrar entrega con foto del albarán.",
     archivos: ["Cotizacion_309.pdf"],
     historico: [
       { fecha: "2025-12-03 08:00", nota: "Cotizacion confirmada" },
@@ -70,6 +80,7 @@ export default function CotizacionesPage() {
   const [vista, setVista] = useState<"tarjetas" | "tabla">("tarjetas");
   const [busqueda, setBusqueda] = useState("");
   const [showRescate, setShowRescate] = useState(false);
+  const [showNuevo, setShowNuevo] = useState(false);
   const [preview, setPreview] = useState<Cotizacion | null>(null);
   const [entregas, setEntregas] = useState<Record<number, string>>({});
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(cotizacionesData);
@@ -78,6 +89,40 @@ export default function CotizacionesPage() {
     actual: Etapa;
     nueva: Etapa;
   } | null>(null);
+  const [nueva, setNueva] = useState<Cotizacion>({
+    id: Math.max(...cotizacionesData.map((c) => c.id)) + 1,
+    codigo: "NUEVA-001",
+    cliente: "",
+    fecha: new Date().toISOString().slice(0, 10),
+    total: "$0",
+    etapa: "Cotizacion confirmada",
+    resumen: "",
+    direccion: "",
+    comentarios: "",
+    archivos: [],
+    historico: [],
+  });
+
+  const handleCrearCotizacion = () => {
+    if (!nueva.cliente || !nueva.total) return;
+    const nextId = cotizaciones.length ? Math.max(...cotizaciones.map((c) => c.id)) + 1 : 1;
+    const nuevaCot = { ...nueva, id: nextId, codigo: `COT-${nextId}` };
+    setCotizaciones([nuevaCot, ...cotizaciones]);
+    setShowNuevo(false);
+    setNueva({
+      id: nextId + 1,
+      codigo: `COT-${nextId + 1}`,
+      cliente: "",
+      fecha: new Date().toISOString().slice(0, 10),
+      total: "$0",
+      etapa: "Cotizacion confirmada",
+      resumen: "",
+      direccion: "",
+      comentarios: "",
+      archivos: [],
+      historico: [],
+    });
+  };
 
   const resumenPorEtapa = useMemo(() => {
     return etapasOrden.map((etapa) => ({
@@ -121,6 +166,11 @@ export default function CotizacionesPage() {
     const actualIndex = etapasOrden.indexOf(cot.etapa);
     const nextIndex = Math.min(Math.max(actualIndex + direction, 0), etapasOrden.length - 1);
     if (nextIndex === actualIndex) return;
+    // Bloquear retroceso desde Entregado
+    if (cot.etapa === "Entregado" && direction === -1) {
+      window.alert("Esta cotizacion ya está entregada; no se puede retroceder.");
+      return;
+    }
 
     const nuevaEtapa = etapasOrden[nextIndex];
     const etapasCriticas = new Set<Etapa>(["Despacho", "Transito", "Entregado"]);
@@ -143,13 +193,22 @@ export default function CotizacionesPage() {
             Rescata cotizaciones, revisa avances por etapa y registra entregas con respaldo de archivos.
           </p>
         </div>
-        <button
-          onClick={() => setShowRescate(true)}
-          className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
-        >
-          <FolderKanban size={18} />
-          Rescatar cotizaciones
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setShowRescate(true)}
+            className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+          >
+            <FolderKanban size={18} />
+            Rescatar cotizaciones
+          </button>
+          <button
+            onClick={() => setShowNuevo(true)}
+            className="flex items-center gap-2 border border-[#1A6CD3] text-[#1A6CD3] font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 bg-white"
+          >
+            <FileText size={18} />
+            Agregar cotizacion
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
@@ -235,8 +294,9 @@ export default function CotizacionesPage() {
                   <p className="text-xs text-gray-500">Cotizacion #{cot.id}</p>
                   <h3 className="text-xl font-bold text-[#1A334B]">{cot.cliente}</h3>
                   <p className="text-sm text-gray-600">{cot.resumen}</p>
-                  <p className="text-xs text-gray-500 mt-1">Fecha: {cot.fecha} · Total: {cot.total}</p>
-                </div>
+                <p className="text-xs text-gray-500 mt-1">Fecha: {cot.fecha} · Total: {cot.total}</p>
+                <p className="text-xs text-gray-500">Dirección: {cot.direccion}</p>
+              </div>
                 <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F0FB] text-[#1A6CD3]">
                   {cot.etapa}
                 </span>
@@ -286,6 +346,7 @@ export default function CotizacionesPage() {
                     <li key={idx}>• {h.fecha} - {h.nota}</li>
                   ))}
                 </ul>
+                <p className="text-xs text-gray-500 mt-2">Comentarios: {cot.comentarios}</p>
               </div>
 
               <div className="mt-4 flex flex-col gap-2">
@@ -371,18 +432,22 @@ export default function CotizacionesPage() {
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.fecha}</td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.total}</td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{cot.resumen}</td>
+                    <td className="py-3 px-4 text-sm text-gray-600">
+                      <p>{cot.resumen}</p>
+                      <p className="text-xs text-gray-500 mt-1">Dirección: {cot.direccion}</p>
+                      <p className="text-xs text-gray-500">Comentarios: {cot.comentarios}</p>
+                    </td>
                     <td className="py-3 px-4 text-sm text-gray-700">
                       <div className="flex flex-col gap-1">
                         <div className="h-2 w-full rounded-full bg-[#E6F0FB] overflow-hidden">
                           <div className="h-full bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F]" style={{ width: `${progreso}%` }} />
                         </div>
-                        <span className="text-xs text-gray-500">{Math.round(progreso)}% ({cot.etapa})</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">
-                      {entregaGuardada ? entregaGuardada : <span className="text-gray-400">No registrada</span>}
-                    </td>
+              <span className="text-xs text-gray-500">{Math.round(progreso)}% ({cot.etapa})</span>
+            </div>
+          </td>
+          <td className="py-3 px-4 text-sm text-gray-700">
+            {entregaGuardada ? entregaGuardada : <span className="text-gray-400">No registrada</span>}
+          </td>
                     <td className="py-3 px-4 text-sm text-gray-700">
                       <div className="flex items-center gap-1">
                         <FileText size={14} className="text-[#1A6CD3]" />
@@ -483,6 +548,8 @@ export default function CotizacionesPage() {
             <p className="text-sm text-gray-700"><strong>Cliente:</strong> {preview.cliente}</p>
             <p className="text-sm text-gray-700"><strong>Total:</strong> {preview.total}</p>
             <p className="text-sm text-gray-700"><strong>Resumen:</strong> {preview.resumen}</p>
+            <p className="text-sm text-gray-700"><strong>Dirección:</strong> {preview.direccion}</p>
+            <p className="text-sm text-gray-700"><strong>Comentarios:</strong> {preview.comentarios}</p>
             <div className="text-sm text-gray-700">
               <p className="font-semibold text-[#1A334B] mb-1">Etapas</p>
               <div className="flex flex-wrap gap-2">
@@ -500,6 +567,12 @@ export default function CotizacionesPage() {
                 ))}
               </div>
             </div>
+            {preview.imagenUrl && (
+              <div className="text-sm text-gray-700">
+                <p className="font-semibold text-[#1A334B] mb-1">Documento (imagen)</p>
+                <img src={preview.imagenUrl} alt="Cotizacion" className="w-full rounded-lg border border-[#D9E7F5]" />
+              </div>
+            )}
             <div className="text-sm text-gray-700">
               <p className="font-semibold text-[#1A334B] mb-1">Archivos</p>
               <ul className="list-disc pl-5 space-y-1">
@@ -521,12 +594,66 @@ export default function CotizacionesPage() {
               Cerrar
             </button>
           </div>
+      </Modal>
+    )}
+
+      {showNuevo && (
+        <Modal onClose={() => setShowNuevo(false)}>
+          <div className="p-5 space-y-3">
+            <h3 className="text-xl font-bold text-[#1A334B]">Agregar cotizacion</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Input label="Cliente" value={nueva.cliente} onChange={(v) => setNueva({ ...nueva, cliente: v })} />
+              <Input label="Fecha" type="date" value={nueva.fecha} onChange={(v) => setNueva({ ...nueva, fecha: v })} />
+              <Input label="Total (texto)" value={nueva.total} onChange={(v) => setNueva({ ...nueva, total: v })} />
+              <Input label="Resumen" value={nueva.resumen} onChange={(v) => setNueva({ ...nueva, resumen: v })} />
+              <Input label="Direccion" value={nueva.direccion} onChange={(v) => setNueva({ ...nueva, direccion: v })} />
+              <Input label="Comentarios" value={nueva.comentarios} onChange={(v) => setNueva({ ...nueva, comentarios: v })} />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-semibold text-[#1A334B]">Etapa</span>
+                <select
+                  className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
+                  value={nueva.etapa}
+                  onChange={(e) => setNueva({ ...nueva, etapa: e.target.value as Etapa })}
+                >
+                  {etapasOrden.map((e) => (
+                    <option key={e} value={e}>{e}</option>
+                  ))}
+                </select>
+              </div>
+              <Input
+                label="Fecha/hora entrega"
+                type="datetime-local"
+                value={nueva.entregaProgramada || ""}
+                onChange={(v) => setNueva({ ...nueva, entregaProgramada: v })}
+              />
+              <Input
+                label="URL imagen (opcional)"
+                value={nueva.imagenUrl || ""}
+                onChange={(v) => setNueva({ ...nueva, imagenUrl: v })}
+              />
+            </div>
+            <p className="text-xs text-gray-500">* En producción, estas cotizaciones deberían llegar desde la API de rescate.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowNuevo(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCrearCotizacion}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
 
-      {confirmCambio && (
-        <Modal onClose={() => setConfirmCambio(null)}>
-          <div className="p-5 space-y-3">
+    {confirmCambio && (
+      <Modal onClose={() => setConfirmCambio(null)}>
+        <div className="p-5 space-y-3">
             <h3 className="text-xl font-bold text-[#1A334B]">Confirmar cambio</h3>
             <p className="text-sm text-gray-700">
               La cotizacion esta en <strong>{confirmCambio.actual}</strong>. ¿Mover a <strong>{confirmCambio.nueva}</strong>?
@@ -552,5 +679,29 @@ export default function CotizacionesPage() {
         </Modal>
       )}
     </MainLayout>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-[#1A334B]">
+      <span className="font-semibold">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+      />
+    </label>
   );
 }

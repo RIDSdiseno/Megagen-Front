@@ -9,8 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@prisma/client": "^7.0.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.555.0",
+    "prisma": "^7.0.1",
     "react": "^19.2.0",
     "react-big-calendar": "^1.19.4",
     "react-countup": "^6.5.3",

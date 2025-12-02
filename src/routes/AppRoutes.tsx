@@ -3,6 +3,7 @@ import LoginPage from "../pages/LoginPage";
 import DashboardHome from "../pages/DashboardHome";
 import Leads from "../pages/Leads";
 import CalendarPage from "../pages/Calendar";
+import ForgotPasswordPage from "../pages/ForgotPassword";
 import CotizacionesPage from "../pages/Quotes";
 import UsuariosPage from "../pages/Users";
 import ConfiguracionPage from "../pages/Settings";
@@ -14,6 +15,7 @@ export default function AppRoutes() {
 
       {/* PUBLIC */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot" element={<ForgotPasswordPage />} />
 
       {/* PRIVATE */}
       <Route 
