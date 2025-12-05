@@ -1,7 +1,23 @@
+import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth, type Role } from "../context/AuthContext";
 
-export default function ProtectedRoute({ children }: any) {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" />;
+type Props = {
+  children: ReactNode;
+  allowedRoles?: Role[];
+};
+
+export default function ProtectedRoute({ children, allowedRoles }: Props) {
+  const { user, hasRole } = useAuth();
+  if (!user) return <Navigate to="/login" />;
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    const canAccess = hasRole(allowedRoles);
+    if (!canAccess) {
+      if (user.roles.includes("bodeguero")) return <Navigate to="/cotizaciones" replace />;
+      return <Navigate to="/dashboard" replace />;
+    }
+  }
+
+  return children;
 }

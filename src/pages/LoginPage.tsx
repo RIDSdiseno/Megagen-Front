@@ -2,23 +2,37 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import LogoLogin from "../../public/LogoLogin.jpg";
+const logoLogin = "/LogoLogin.jpg";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const ok = login(email, password);
-    if (ok) {
+    setError("");
+    setLoading(true);
+    try {
+      await login(email, password);
+      const stored = localStorage.getItem("user");
+      if (stored) {
+        const parsed = JSON.parse(stored) as { roles?: string[] };
+        if (parsed.roles?.includes("bodeguero")) {
+          navigate("/cotizaciones");
+          return;
+        }
+      }
       navigate("/dashboard");
-    } else {
-      setError("Credenciales incorrectas");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Credenciales incorrectas";
+      setError(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,7 +72,7 @@ export default function LoginPage() {
         {/* LOGO LOGIN */}
         <div className="flex justify-center mb-8">
           <img
-            src={LogoLogin}
+            src={logoLogin}
             alt="Logo MegaGen"
             className="w-48 h-auto drop-shadow-xl animate-fadeIn"
           />
@@ -84,7 +98,7 @@ export default function LoginPage() {
             <input
               type="email"
               required
-            className="
+              className="
                 w-full px-4 py-3 border border-[#D9E7F5] rounded-lg
                 focus:outline-none focus:ring-4 focus:ring-megagen-primary/50
                 focus:border-megagen-primary text-lg bg-white
@@ -93,6 +107,7 @@ export default function LoginPage() {
               placeholder="usuario@megagen.cl"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              disabled={loading}
             />
           </div>
 
@@ -110,9 +125,10 @@ export default function LoginPage() {
                   focus:border-megagen-primary text-lg bg-white
                   shadow-sm text-gray-800
                 "
-                placeholder="••••••••"
+                placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
               <button
                 type="button"
@@ -143,13 +159,15 @@ export default function LoginPage() {
 
           <button
             type="submit"
+            disabled={loading}
             className="
               w-full py-3 bg-megagen-primary hover:bg-megagen-dark 
               text-white font-bold text-lg rounded-xl shadow-lg 
               transition-all hover:shadow-megagen-primary/40 hover:shadow-2xl
+              disabled:opacity-70 disabled:cursor-not-allowed
             "
           >
-            Ingresar al CRM
+            {loading ? "Validando..." : "Ingresar al CRM"}
           </button>
 
         </form>

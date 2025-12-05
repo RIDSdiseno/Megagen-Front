@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import MainLayout from "../components/MainLayout";
 import Modal from "../components/Modal";
-import { FileText, FolderKanban, ArrowRight, CheckCircle, Clock3 } from "lucide-react";
+import { FileText, FolderKanban, ArrowRight, CheckCircle, Clock3, Loader2, RefreshCw } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 type Etapa = "Cotizacion confirmada" | "Despacho" | "Transito" | "Entregado";
 
@@ -22,64 +23,25 @@ type Cotizacion = {
 };
 
 const etapasOrden: Etapa[] = ["Cotizacion confirmada", "Despacho", "Transito", "Entregado"];
-
-const cotizacionesData: Cotizacion[] = [
-  {
-    id: 101,
-    codigo: "COT-101",
-    cliente: "Clinica Smile",
-    fecha: "2025-12-01",
-    total: "$2.450.000",
-    etapa: "Cotizacion confirmada",
-    resumen: "Implantes premium y guia quirurgica personalizada.",
-    direccion: "AV Ramon Picarte 427, Oficina 409, Valdivia",
-    comentarios: "Enviar a la misma direccion de despacho. Contacto: Daniel Carvajal.",
-    imagenUrl: "https://via.placeholder.com/800x1100?text=Cotizacion+Clinica+Smile",
-    archivos: ["Cotizacion_101.pdf", "GuiaSmile.stl"],
-    historico: [
-      { fecha: "2025-12-01 09:00", nota: "Cotizacion enviada" },
-      { fecha: "2025-12-02 14:00", nota: "Cliente revisa y pide descuento" },
-    ],
-    entregaProgramada: "2025-12-05T15:00",
-  },
-  {
-    id: 205,
-    codigo: "COT-205",
-    cliente: "Dr. Perez",
-    fecha: "2025-12-02",
-    total: "$1.180.000",
-    etapa: "Despacho",
-    resumen: "Kit de implantes y componentes de laboratorio.",
-    direccion: "Av. America 2280, Conchali, Santiago",
-    comentarios: "Despachar a Matta 22, confirmar recepción.",
-    archivos: ["Cotizacion_205.pdf", "OrdenCompra.png"],
-    historico: [
-      { fecha: "2025-12-02 10:00", nota: "Cotizacion aprobada" },
-      { fecha: "2025-12-03 11:30", nota: "Despacho generado" },
-    ],
-    entregaProgramada: "2025-12-06T11:00",
-  },
-  {
-    id: 309,
-    codigo: "COT-309",
-    cliente: "SmileLab",
-    fecha: "2025-12-03",
-    total: "$3.050.000",
-    etapa: "Transito",
-    resumen: "Pedido consolidado de implantes y aditamentos.",
-    direccion: "Av. Providencia 1001, Oficina 1203, Santiago",
-    comentarios: "Registrar entrega con foto del albarán.",
-    archivos: ["Cotizacion_309.pdf"],
-    historico: [
-      { fecha: "2025-12-03 08:00", nota: "Cotizacion confirmada" },
-      { fecha: "2025-12-04 16:00", nota: "Despacho enviado" },
-    ],
-  },
-];
-
 const periodos: Array<"Semana" | "Dia" | "Mes"> = ["Semana", "Dia", "Mes"];
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+
+const etapaColors: Record<Etapa, string> = {
+  "Cotizacion confirmada": "bg-sky-100 text-sky-700 border-sky-200",
+  "Despacho": "bg-amber-100 text-amber-700 border-amber-200",
+  "Transito": "bg-purple-100 text-purple-700 border-purple-200",
+  "Entregado": "bg-emerald-100 text-emerald-700 border-emerald-200",
+};
+
+const tipoDocumentoPorEtapa: Record<Etapa, string> = {
+  "Cotizacion confirmada": "Cotizacion",
+  "Despacho": "Guia de despacho",
+  "Transito": "Orden en transito",
+  "Entregado": "Entrega final",
+};
 
 export default function CotizacionesPage() {
+  const { user } = useAuth();
   const [periodo, setPeriodo] = useState<"Semana" | "Dia" | "Mes">("Semana");
   const [vista, setVista] = useState<"tarjetas" | "tabla">("tarjetas");
   const [busqueda, setBusqueda] = useState("");
@@ -87,14 +49,11 @@ export default function CotizacionesPage() {
   const [showNuevo, setShowNuevo] = useState(false);
   const [preview, setPreview] = useState<Cotizacion | null>(null);
   const [entregas, setEntregas] = useState<Record<number, string>>({});
-  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>(cotizacionesData);
-  const [confirmCambio, setConfirmCambio] = useState<{
-    id: number;
-    actual: Etapa;
-    nueva: Etapa;
-  } | null>(null);
+  const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
+  const [summary, setSummary] = useState<{ etapa: Etapa; total: number }[]>([]);
+  const [confirmCambio, setConfirmCambio] = useState<{ id: number; nueva: Etapa; actual: Etapa } | null>(null);
   const [nueva, setNueva] = useState<Cotizacion>({
-    id: Math.max(...cotizacionesData.map((c) => c.id)) + 1,
+    id: 0,
     codigo: "NUEVA-001",
     cliente: "",
     fecha: new Date().toISOString().slice(0, 10),
@@ -106,34 +65,102 @@ export default function CotizacionesPage() {
     archivos: [],
     historico: [],
   });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [archivoDraft, setArchivoDraft] = useState<Record<number, string>>({});
 
-  const handleCrearCotizacion = () => {
+  const headers = useMemo(() => {
+    const h: Record<string, string> = { "Content-Type": "application/json" };
+    if (user?.token) h["Authorization"] = `Bearer ${user.token}`;
+    return h;
+  }, [user?.token]);
+
+  const fetchQuotes = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(`${API_URL}/quotes`);
+      if (!resp.ok) throw new Error("No se pudieron cargar las cotizaciones");
+      const data = (await resp.json()) as Cotizacion[];
+      setCotizaciones(data);
+      const entregasMap: Record<number, string> = {};
+      data.forEach((c) => {
+        if (c.entregaProgramada) entregasMap[c.id] = c.entregaProgramada;
+      });
+      setEntregas(entregasMap);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSummary = async () => {
+    try {
+      const resp = await fetch(`${API_URL}/quotes/summary`);
+      if (!resp.ok) throw new Error("No se pudo cargar el resumen");
+      const data = (await resp.json()) as { etapa: Etapa; total: number }[];
+      setSummary(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error desconocido");
+    }
+  };
+
+  useEffect(() => {
+    fetchQuotes();
+    fetchSummary();
+  }, []);
+
+  const agregarArchivo = (cotId: number, nombre: string) => {
+    if (!nombre) return;
+    setCotizaciones((prev) =>
+      prev.map((c) => (c.id === cotId ? { ...c, archivos: [...c.archivos, nombre] } : c))
+    );
+  };
+
+  const handleCrearCotizacion = async () => {
     if (!nueva.cliente || !nueva.total) return;
-    const nextId = cotizaciones.length ? Math.max(...cotizaciones.map((c) => c.id)) + 1 : 1;
-    const nuevaCot = { ...nueva, id: nextId, codigo: `COT-${nextId}` };
-    setCotizaciones([nuevaCot, ...cotizaciones]);
-    setShowNuevo(false);
-    setNueva({
-      id: nextId + 1,
-      codigo: `COT-${nextId + 1}`,
-      cliente: "",
-      fecha: new Date().toISOString().slice(0, 10),
-      total: "$0",
-      etapa: "Cotizacion confirmada",
-      resumen: "",
-      direccion: "",
-      comentarios: "",
-      archivos: [],
-      historico: [],
-    });
+    setError("");
+    try {
+      const resp = await fetch(`${API_URL}/quotes`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(nueva),
+      });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(e.message || "No se pudo crear la cotizacion");
+      }
+      const creada = (await resp.json()) as Cotizacion;
+      setCotizaciones((prev) => [creada, ...prev]);
+      setSummary((prev) => {
+        const map = new Map<Etapa, number>();
+        prev.forEach((s) => map.set(s.etapa, s.total));
+        map.set(creada.etapa, (map.get(creada.etapa) || 0) + 1);
+        return etapasOrden.map((etapa) => ({ etapa, total: map.get(etapa) || 0 }));
+      });
+      setShowNuevo(false);
+      setNueva({
+        ...nueva,
+        cliente: "",
+        total: "$0",
+        resumen: "",
+        direccion: "",
+        comentarios: "",
+        imagenUrl: "",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al crear cotizacion");
+    }
   };
 
   const resumenPorEtapa = useMemo(() => {
+    if (summary.length) return summary;
     return etapasOrden.map((etapa) => ({
       etapa,
       total: cotizaciones.filter((c) => c.etapa === etapa).length,
     }));
-  }, [cotizaciones]);
+  }, [cotizaciones, summary]);
 
   const filtradas = useMemo(() => {
     const term = busqueda.toLowerCase();
@@ -141,26 +168,35 @@ export default function CotizacionesPage() {
       (c) =>
         c.cliente.toLowerCase().includes(term) ||
         c.resumen.toLowerCase().includes(term) ||
-        c.id.toString().includes(term)
+        c.id.toString().includes(term) ||
+        c.codigo.toLowerCase().includes(term)
     );
   }, [busqueda, cotizaciones]);
 
-  const handleRegistrarEntrega = (id: number, fecha: string) => {
-    setEntregas((prev) => ({ ...prev, [id]: fecha }));
-  };
-
-  const aplicarCambioEtapa = (id: number, nuevaEtapa: Etapa) => {
-    setCotizaciones((prev) =>
-      prev.map((c) => {
-        if (c.id !== id) return c;
-        const ahora = new Date().toLocaleString("es-CL");
-        const nuevoHistorico = [
-          ...c.historico,
-          { fecha: ahora, nota: `Etapa cambiada a ${nuevaEtapa}` },
-        ];
-        return { ...c, etapa: nuevaEtapa, historico: nuevoHistorico };
-      })
-    );
+  const aplicarCambioEtapa = async (id: number, nuevaEtapa: Etapa) => {
+    setError("");
+    try {
+      const resp = await fetch(`${API_URL}/quotes/${id}/stage`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ etapa: nuevaEtapa }),
+      });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        setError(e.message || "No se pudo cambiar la etapa");
+        if (e.historico) {
+          setCotizaciones((prev) =>
+            prev.map((c) => (c.id === id ? { ...c, historico: e.historico } : c))
+          );
+        }
+        return;
+      }
+      const updated = (await resp.json()) as Cotizacion;
+      setCotizaciones((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      fetchSummary();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al cambiar etapa");
+    }
   };
 
   const solicitarCambio = (id: number, direction: 1 | -1) => {
@@ -170,11 +206,6 @@ export default function CotizacionesPage() {
     const actualIndex = etapasOrden.indexOf(cot.etapa);
     const nextIndex = Math.min(Math.max(actualIndex + direction, 0), etapasOrden.length - 1);
     if (nextIndex === actualIndex) return;
-    // Bloquear retroceso desde Entregado
-    if (cot.etapa === "Entregado" && direction === -1) {
-      window.alert("Esta cotizacion ya está entregada; no se puede retroceder.");
-      return;
-    }
 
     const nuevaEtapa = etapasOrden[nextIndex];
     const etapasCriticas = new Set<Etapa>(["Despacho", "Transito", "Entregado"]);
@@ -185,6 +216,25 @@ export default function CotizacionesPage() {
     }
 
     aplicarCambioEtapa(id, nuevaEtapa);
+  };
+
+  const handleScanDemo = async () => {
+    setError("");
+    try {
+      const resp = await fetch(`${API_URL}/quotes/scan`, { method: "POST", headers });
+      if (!resp.ok) throw new Error("No se pudo escanear");
+      const data = await resp.json();
+      setNueva((prev) => ({
+        ...prev,
+        direccion: data.direccion || prev.direccion,
+        comentarios: data.comentarios || prev.comentarios,
+        resumen: data.resumen || prev.resumen,
+        total: data.total || prev.total,
+        cliente: data.cliente || prev.cliente,
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error en escaneo");
+    }
   };
 
   return (
@@ -206,20 +256,28 @@ export default function CotizacionesPage() {
             Rescatar cotizaciones
           </button>
           <button
-            onClick={() => setShowNuevo(true)}
-            className="flex items-center gap-2 border border-[#1A6CD3] text-[#1A6CD3] font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 bg-white"
+            onClick={() => {
+              fetchQuotes();
+              fetchSummary();
+            }}
+            className="flex items-center gap-2 border border-[#D9E7F5] text-[#1A334B] font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5 bg-white"
           >
-            <FileText size={18} />
-            Agregar cotizacion
+            <RefreshCw size={16} /> Actualizar
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-2 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         {resumenPorEtapa.map((item) => (
           <div
             key={item.etapa}
-            className="bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm hover:shadow-md transition-all"
+            className={`bg-white border rounded-xl p-3 shadow-sm hover:shadow-md transition-all ${etapaColors[item.etapa]} bg-opacity-40`}
           >
             <p className="text-xs font-semibold text-gray-500">{item.etapa}</p>
             <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
@@ -281,7 +339,11 @@ export default function CotizacionesPage() {
         </div>
       </div>
 
-      {vista === "tarjetas" ? (
+      {loading ? (
+        <div className="flex items-center gap-2 text-[#1A334B] text-sm">
+          <Loader2 className="animate-spin" size={18} /> Cargando cotizaciones...
+        </div>
+      ) : vista === "tarjetas" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtradas.map((cot) => {
           const etapaIndex = etapasOrden.indexOf(cot.etapa);
@@ -298,10 +360,12 @@ export default function CotizacionesPage() {
                   <p className="text-xs text-gray-500">Cotizacion #{cot.id}</p>
                   <h3 className="text-xl font-bold text-[#1A334B]">{cot.cliente}</h3>
                   <p className="text-sm text-gray-600">{cot.resumen}</p>
-                <p className="text-xs text-gray-500 mt-1">Fecha: {cot.fecha} · Total: {cot.total}</p>
-                <p className="text-xs text-gray-500">Dirección: {cot.direccion}</p>
+                <p className="text-xs text-gray-500 mt-1">Fecha: {cot.fecha} | Total: {cot.total}</p>
+                <p className="text-xs text-gray-500">Direccion: {cot.direccion}</p>
               </div>
-                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F0FB] text-[#1A6CD3]">
+                <span
+                  className={`px-3 py-1 text-xs font-semibold rounded-full border ${etapaColors[cot.etapa]}`}
+                >
                   {cot.etapa}
                 </span>
               </div>
@@ -341,6 +405,42 @@ export default function CotizacionesPage() {
                     </li>
                   ))}
                 </ul>
+                {(cot.etapa === "Cotizacion confirmada" || cot.etapa === "Despacho") ? (
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
+                    <input
+                      type="text"
+                      placeholder="Nombre de archivo"
+                      className="flex-1 border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+                      value={archivoDraft[cot.id] ?? ""}
+                      onChange={(e) => setArchivoDraft((prev) => ({ ...prev, [cot.id]: e.target.value }))}
+                    />
+                    <button
+                      onClick={() => {
+                        const nombre = (archivoDraft[cot.id] ?? "").trim();
+                        if (!nombre) return;
+                        agregarArchivo(cot.id, nombre);
+                        setArchivoDraft((prev) => ({ ...prev, [cot.id]: "" }));
+                      }}
+                      className="px-3 py-2 text-xs font-semibold rounded-lg bg-[#1A6CD3] text-white hover:bg-[#0E4B8F] transition"
+                    >
+                      + Agregar
+                    </button>
+                    <label className="px-3 py-2 text-xs font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD] cursor-pointer">
+                      Subir archivo
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) agregarArchivo(cot.id, file.name);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">No se pueden agregar archivos en tránsito o entregado.</p>
+                )}
               </div>
 
               <div className="mt-3 text-sm text-gray-700 bg-white border border-dashed border-[#D9E7F5] rounded-xl p-3">
@@ -353,26 +453,11 @@ export default function CotizacionesPage() {
                 <p className="text-xs text-gray-500 mt-2">Comentarios: {cot.comentarios}</p>
               </div>
 
-              <div className="mt-4 flex flex-col gap-2">
-                <label className="text-xs font-semibold text-gray-600">Registrar fecha y hora de entrega</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="datetime-local"
-                    className="flex-1 border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
-                    value={entregaGuardada || ""}
-                    onChange={(e) => handleRegistrarEntrega(cot.id, e.target.value)}
-                  />
-                  <button
-                    onClick={() => handleRegistrarEntrega(cot.id, entregaGuardada || "")}
-                    className="px-3 py-2 text-xs font-semibold bg-[#1A6CD3] text-white rounded-lg shadow hover:bg-[#0E4B8F] transition"
-                  >
-                    Guardar
-                  </button>
+              {entregaGuardada && (
+                <div className="mt-4 text-xs text-gray-600">
+                  <span className="font-semibold text-[#1A334B]">Entrega registrada:</span> {entregaGuardada}
                 </div>
-                {entregaGuardada && (
-                  <p className="text-xs text-gray-500">Entrega registrada: {entregaGuardada}</p>
-                )}
-              </div>
+              )}
 
               <div className="mt-4 flex gap-2 flex-wrap">
                 <button
@@ -429,16 +514,16 @@ export default function CotizacionesPage() {
                   <tr key={cot.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
                     <td className="py-3 px-4 text-sm text-gray-700 font-semibold">#{cot.id}</td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.cliente}</td>
-                    <td className="py-3 px-4 text-sm">
-                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-[#E6F0FB] text-[#1A6CD3]">
-                        {cot.etapa}
-                      </span>
-                    </td>
+                <td className="py-3 px-4 text-sm">
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${etapaColors[cot.etapa]}`}>
+                    {cot.etapa}
+                  </span>
+                </td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.fecha}</td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.total}</td>
                     <td className="py-3 px-4 text-sm text-gray-600">
                       <p>{cot.resumen}</p>
-                      <p className="text-xs text-gray-500 mt-1">Dirección: {cot.direccion}</p>
+                      <p className="text-xs text-gray-500 mt-1">Direccion: {cot.direccion}</p>
                       <p className="text-xs text-gray-500">Comentarios: {cot.comentarios}</p>
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-700">
@@ -452,12 +537,50 @@ export default function CotizacionesPage() {
           <td className="py-3 px-4 text-sm text-gray-700">
             {entregaGuardada ? entregaGuardada : <span className="text-gray-400">No registrada</span>}
           </td>
-                    <td className="py-3 px-4 text-sm text-gray-700">
-                      <div className="flex items-center gap-1">
-                        <FileText size={14} className="text-[#1A6CD3]" />
-                        <span>{cot.archivos.length}</span>
-                      </div>
-                    </td>
+          <td className="py-3 px-4 text-sm text-gray-700">
+            <div className="flex items-center gap-1">
+              <FileText size={14} className="text-[#1A6CD3]" />
+              <span>{cot.archivos.length}</span>
+            </div>
+            {(cot.etapa === "Cotizacion confirmada" || cot.etapa === "Despacho") ? (
+              <div className="mt-2 space-y-1">
+                <input
+                  type="text"
+                  placeholder="Nombre archivo"
+                  className="w-full border border-[#D9E7F5] rounded-lg px-3 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+                  value={archivoDraft[cot.id] ?? ""}
+                  onChange={(e) => setArchivoDraft((prev) => ({ ...prev, [cot.id]: e.target.value }))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const nombre = (archivoDraft[cot.id] ?? "").trim();
+                      if (!nombre) return;
+                      agregarArchivo(cot.id, nombre);
+                      setArchivoDraft((prev) => ({ ...prev, [cot.id]: "" }));
+                    }}
+                    className="px-2 py-1 text-[11px] font-semibold rounded-lg bg-[#1A6CD3] text-white hover:bg-[#0E4B8F] transition"
+                  >
+                    + Agregar
+                  </button>
+                  <label className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD] cursor-pointer">
+                    Subir
+                    <input
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) agregarArchivo(cot.id, file.name);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-[11px] text-gray-500">Sin nuevos archivos en tránsito/entregado</p>
+            )}
+          </td>
                     <td className="py-3 px-4 text-sm">
                       <div className="flex items-center gap-2 justify-end">
                         <button
@@ -525,8 +648,8 @@ export default function CotizacionesPage() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-semibold text-[#1A334B]">#{cot.id} · {cot.cliente}</p>
-                      <p className="text-xs text-gray-600">Fecha: {cot.fecha} · {cot.total}</p>
+                      <p className="text-sm font-semibold text-[#1A334B]">#{cot.id} | {cot.cliente}</p>
+                      <p className="text-xs text-gray-600">Fecha: {cot.fecha} | {cot.total}</p>
                     </div>
                     <span className="text-xs px-2 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3]">{cot.etapa}</span>
                   </div>
@@ -539,7 +662,7 @@ export default function CotizacionesPage() {
               onClick={() => setShowRescate(false)}
               className="w-full bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white py-2 rounded-lg font-semibold hover:shadow-lg transition"
             >
-              Cargar cotizaciones seleccionadas
+              Cerrar
             </button>
           </div>
         </Modal>
@@ -552,8 +675,11 @@ export default function CotizacionesPage() {
             <p className="text-sm text-gray-700"><strong>Cliente:</strong> {preview.cliente}</p>
             <p className="text-sm text-gray-700"><strong>Total:</strong> {preview.total}</p>
             <p className="text-sm text-gray-700"><strong>Resumen:</strong> {preview.resumen}</p>
-            <p className="text-sm text-gray-700"><strong>Dirección:</strong> {preview.direccion}</p>
+            <p className="text-sm text-gray-700"><strong>Direccion:</strong> {preview.direccion}</p>
             <p className="text-sm text-gray-700"><strong>Comentarios:</strong> {preview.comentarios}</p>
+            <p className="text-sm text-gray-700">
+              <strong>Tipo de documento:</strong> {tipoDocumentoPorEtapa[preview.etapa] || "Cotizacion"}
+            </p>
             <div className="text-sm text-gray-700">
               <p className="font-semibold text-[#1A334B] mb-1">Etapas</p>
               <div className="flex flex-wrap gap-2">
@@ -604,7 +730,15 @@ export default function CotizacionesPage() {
       {showNuevo && (
         <Modal onClose={() => setShowNuevo(false)}>
           <div className="p-5 space-y-3">
-            <h3 className="text-xl font-bold text-[#1A334B]">Agregar cotizacion</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold text-[#1A334B]">Agregar cotizacion</h3>
+              <button
+                onClick={handleScanDemo}
+                className="text-xs font-semibold text-[#1A6CD3] border border-[#1A6CD3] rounded-lg px-3 py-1 hover:bg-[#E6F0FB]"
+              >
+                Autocompletar (demo OCR)
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input label="Cliente" value={nueva.cliente} onChange={(v) => setNueva({ ...nueva, cliente: v })} />
               <Input label="Fecha" type="date" value={nueva.fecha} onChange={(v) => setNueva({ ...nueva, fecha: v })} />
@@ -636,7 +770,7 @@ export default function CotizacionesPage() {
                 onChange={(v) => setNueva({ ...nueva, imagenUrl: v })}
               />
             </div>
-            <p className="text-xs text-gray-500">* En producción, estas cotizaciones deberían llegar desde la API de rescate.</p>
+            <p className="text-xs text-gray-500">* En produccion, estas cotizaciones deberian llegar desde la API de rescate.</p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNuevo(false)}
@@ -709,3 +843,5 @@ function Input({
     </label>
   );
 }
+
+

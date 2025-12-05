@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft } from "lucide-react";
-import LogoLogin from "../../public/LogoLogin.jpg";
+const logoLogin = "/LogoLogin.jpg";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -44,7 +44,7 @@ export default function ForgotPasswordPage() {
         </button>
 
         <div className="flex justify-center mb-6">
-          <img src={LogoLogin} alt="Logo MegaGen" className="w-36 h-auto drop-shadow-xl" />
+          <img src={logoLogin} alt="Logo MegaGen" className="w-36 h-auto drop-shadow-xl" />
         </div>
 
         <h1 className="text-3xl font-extrabold text-[#1A334B] text-center mb-2">Recuperar acceso</h1>

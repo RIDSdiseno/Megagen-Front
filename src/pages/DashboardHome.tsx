@@ -1,3 +1,4 @@
+import { useState } from "react";
 import MainLayout from "../components/MainLayout";
 import CountUp from "react-countup";
 import {
@@ -9,6 +10,8 @@ import {
   Users,
   Gauge,
   DollarSign,
+  Building2,
+  AlertTriangle,
 } from "lucide-react";
 
 type KPIConfig = {
@@ -22,10 +25,13 @@ type KPIConfig = {
 const kpis: KPIConfig[] = [
   { title: "Ventas del mes", value: "$58.4M", change: 12, icon: DollarSign, hint: "Vs mes anterior" },
   { title: "Ticket medio", value: "$480K", change: 6, icon: BarChart3, hint: "Promedio por venta" },
-  { title: "Ratio de conversión", value: 27, change: 3, icon: Target, hint: "Lead a venta" },
-  { title: "Tiempo promedio de venta", value: "12.5 días", change: -2, icon: Clock3, hint: "De lead a cierre" },
-  { title: "Leads por semana", value: 142, change: 8, icon: Users, hint: "Última semana" },
+  { title: "Ratio de conversion", value: 27, change: 3, icon: Target, hint: "Lead a venta" },
+  { title: "Tiempo promedio de venta", value: "12.5 dias", change: -2, icon: Clock3, hint: "De lead a cierre" },
+  { title: "Leads por semana", value: 142, change: 8, icon: Users, hint: "Ultima semana" },
   { title: "Pipeline activo", value: "$214M", change: 4, icon: Gauge, hint: "Monto total" },
+  { title: "Clinicas activas", value: 48, change: 5, icon: Building2, hint: "Clientes B2B" },
+  { title: "Clientes en riesgo", value: 12, change: -1, icon: AlertTriangle, hint: "Seguir esta semana" },
+  { title: "Leads nuevos 24h", value: 22, change: 10, icon: Users, hint: "Entrantes recientes" },
 ];
 
 const ventasMes = [
@@ -42,7 +48,7 @@ const pipeline = [
   { etapa: "Prospectos", valor: 420, tasa: 100 },
   { etapa: "Calificados", valor: 260, tasa: 62 },
   { etapa: "Propuesta", valor: 150, tasa: 36 },
-  { etapa: "Negociación", valor: 95, tasa: 23 },
+  { etapa: "Negociacion", valor: 95, tasa: 23 },
   { etapa: "Cerrado", valor: 58, tasa: 14 },
 ];
 
@@ -56,32 +62,68 @@ const razonesPerdida = [
 
 const oportunidades = [
   { cliente: "Clinica Smile", etapa: "Propuesta", monto: "$18.5M", dias: 5 },
-  { cliente: "Dr. Ruiz", etapa: "Negociación", monto: "$12.2M", dias: 9 },
+  { cliente: "Dr. Ruiz", etapa: "Negociacion", monto: "$12.2M", dias: 9 },
   { cliente: "Centro Andes", etapa: "Calificados", monto: "$9.4M", dias: 3 },
   { cliente: "SmileLab", etapa: "Cerrado", monto: "$22.1M", dias: 1 },
 ];
 
+const resumenGeneral = [
+  { titulo: "Clientes activos", valor: 84, detalle: "Incluye 48 clinicas", color: "from-emerald-500 to-emerald-700" },
+  { titulo: "Clientes en onboarding", valor: 12, detalle: "Plan de adopcion en curso", color: "from-amber-500 to-amber-700" },
+  { titulo: "Leads calientes", valor: 34, detalle: "Propuesta o negociacion", color: "from-sky-500 to-sky-700" },
+  { titulo: "Reuniones programadas", valor: 19, detalle: "Proximas 72 horas", color: "from-indigo-500 to-indigo-700" },
+];
+
 export default function DashboardHome() {
+  const [rango, setRango] = useState<"semana" | "30" | "historico">("30");
   return (
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Dashboard de crecimiento sostenible</p>
-          <h2 className="text-3xl font-extrabold text-[#1A334B]">Visión general comercial</h2>
+          <h2 className="text-3xl font-extrabold text-[#1A334B]">Vision general comercial</h2>
           <p className="text-gray-600">
-            Ventas, leads, conversión y pipeline en un solo panel para análisis semanal y optimización.
+            Ventas, leads, conversion y pipeline en un solo panel para analisis semanal y optimizacion.
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <button className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD] transition">
-            Esta semana
-          </button>
-          <button className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white shadow hover:shadow-lg transition">
-            Últimos 30 días
-          </button>
+        <div className="flex flex-col items-start gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <button
+              className={
+                rango === "semana"
+                  ? "px-4 py-2 text-sm font-semibold rounded-lg border bg-[#1A6CD3] text-white border-[#1A6CD3]"
+                  : "px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              }
+              onClick={() => setRango("semana")}
+            >
+              Esta semana
+            </button>
+            <button
+              className={
+                rango === "30"
+                  ? "px-4 py-2 text-sm font-semibold rounded-lg border bg-[#1A6CD3] text-white border-[#1A6CD3]"
+                  : "px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              }
+              onClick={() => setRango("30")}
+            >
+              Ultimos 30 dias
+            </button>
+            <button
+              className={
+                rango === "historico"
+                  ? "px-4 py-2 text-sm font-semibold rounded-lg border bg-[#0E4B8F] text-white border-[#0E4B8F]"
+                  : "px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              }
+              onClick={() => setRango("historico")}
+            >
+              Historico
+            </button>
+          </div>
+          <div className="text-xs text-gray-500">
+            Filtro activo: {rango === "semana" ? "Semana actual" : rango === "30" ? "Ultimos 30 dias" : "Historico"}
+          </div>
         </div>
       </div>
-
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
         {kpis.map((kpi) => (
@@ -157,6 +199,7 @@ export default function DashboardHome() {
             </div>
           </div>
         </div>
+
       </div>
 
       {/* Pipeline y perdidas */}
@@ -187,7 +230,7 @@ export default function DashboardHome() {
 
         <div className="bg-white border border-[#D9E7F5] rounded-2xl shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-xl font-bold text-[#1A334B]">Razones de pérdida</h3>
+            <h3 className="text-xl font-bold text-[#1A334B]">Razones de perdida</h3>
             <span className="text-xs text-gray-500">Top motivos</span>
           </div>
           <div className="space-y-3">
@@ -207,6 +250,20 @@ export default function DashboardHome() {
             ))}
           </div>
         </div>
+
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-8">
+        {resumenGeneral.map((item) => (
+          <div
+            key={item.titulo}
+            className={`p-4 rounded-2xl text-white shadow-md bg-gradient-to-r ${item.color}`}
+          >
+            <p className="text-xs uppercase tracking-wide text-white/80 font-semibold">{item.titulo}</p>
+            <p className="text-3xl font-extrabold">{item.valor}</p>
+            <p className="text-sm text-white/90 mt-1">{item.detalle}</p>
+          </div>
+        ))}
       </div>
 
       {/* Oportunidades */}
@@ -224,7 +281,7 @@ export default function DashboardHome() {
                 <th className="py-3 px-4 text-sm">Cliente</th>
                 <th className="py-3 px-4 text-sm">Etapa</th>
                 <th className="py-3 px-4 text-sm">Monto</th>
-                <th className="py-3 px-4 text-sm">Días en etapa</th>
+                <th className="py-3 px-4 text-sm">Dias en etapa</th>
               </tr>
             </thead>
             <tbody>

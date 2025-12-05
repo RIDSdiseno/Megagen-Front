@@ -1,18 +1,42 @@
 import { NavLink } from "react-router-dom";
-import Logo from "/LogoLogin.jpg";
+import Logo from "/LOGO.jpg";
 import { 
   LayoutDashboard, 
   Users, 
   Calendar, 
   FileText, 
   Settings, 
-  UserCog 
+  UserCog, 
+  Shield 
 } from "lucide-react";
+import { useAuth, type Role } from "../context/AuthContext";
 
 const linkClass =
   "flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-megagen-primary/10 text-[#1A334B] font-semibold";
 
 export default function Sidebar() {
+  const { hasRole } = useAuth();
+
+  const items: Array<{
+    to: string;
+    label: string;
+    icon: React.ComponentType<{ size?: number }>;
+    roles?: Role[];
+  }> = [
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/leads", label: "Leads", icon: Users, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/clientes", label: "Clientes", icon: UserCog, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/calendar", label: "Calendario y Reuniones", icon: Calendar, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/cotizaciones", label: "Cotizaciones", icon: FileText, roles: ["admin", "superadmin", "supervisor", "bodeguero"] },
+    { to: "/usuarios", label: "Usuarios", icon: Shield, roles: ["admin", "superadmin"] },
+    { to: "/configuracion", label: "Configuracion", icon: Settings },
+  ];
+
+  const canSee = (roles?: Role[]) => {
+    if (!roles || roles.length === 0) return true;
+    return hasRole(roles);
+  };
+
   return (
     <div className="flex flex-col h-full p-4">
 
@@ -24,29 +48,14 @@ export default function Sidebar() {
       {/* NAV */}
       <nav className="flex flex-col gap-3 text-sm">
 
-        <NavLink to="/dashboard" className={linkClass}>
-          <LayoutDashboard size={18}/> Dashboard
-        </NavLink>
-
-        <NavLink to="/leads" className={linkClass}>
-          <Users size={18}/> Leads / Clientes
-        </NavLink>
-
-        <NavLink to="/calendar" className={linkClass}>
-          <Calendar size={18}/> Calendario y Reuniones
-        </NavLink>
-
-        <NavLink to="/cotizaciones" className={linkClass}>
-          <FileText size={18}/> Cotizaciones
-        </NavLink>
-
-        <NavLink to="/usuarios" className={linkClass}>
-          <UserCog size={18}/> Usuarios
-        </NavLink>
-
-        <NavLink to="/configuracion" className={linkClass}>
-          <Settings size={18}/> Configuracion
-        </NavLink>
+        {items.filter((item) => canSee(item.roles)).map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink key={item.to} to={item.to} className={linkClass}>
+              <Icon size={18} /> {item.label}
+            </NavLink>
+          );
+        })}
 
       </nav>
     </div>

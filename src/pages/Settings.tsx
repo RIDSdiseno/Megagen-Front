@@ -1,31 +1,90 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import MainLayout from "../components/MainLayout";
 import { Settings, Shield, Bell, Globe2, Lock } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+
+type Perfil = { nombre: string; correo: string; telefono: string; empresa: string };
+type Seguridad = { actual: string; nueva: string; confirmar: string };
+type Notif = { email: boolean; push: boolean; recordatorios: boolean; minutosAntes: number; autoCerrar: boolean };
+type Preferencias = { idioma: string; zonaHoraria: string };
+
+const STORAGE_KEY = "megagen_settings";
+
+const defaultSettings = (email: string | undefined) => ({
+  perfil: { nombre: "", correo: email || "", telefono: "", empresa: "" } as Perfil,
+  notificaciones: { email: true, push: true, recordatorios: true, minutosAntes: 20, autoCerrar: true } as Notif,
+  preferencias: { idioma: "es", zonaHoraria: "America/Santiago" } as Preferencias,
+});
 
 export default function ConfiguracionPage() {
-  const [perfil, setPerfil] = useState({
-    nombre: "Georges",
-    correo: "georges@megagen.cl",
-    telefono: "+56 9 9999 9999",
-    empresa: "MegaGen Chile",
-  });
+  const { user } = useAuth();
+  const location = useLocation();
+  const [perfil, setPerfil] = useState<Perfil>(() => defaultSettings(user?.email).perfil);
+  const [seguridad, setSeguridad] = useState<Seguridad>({ actual: "", nueva: "", confirmar: "" });
+  const [notificaciones, setNotificaciones] = useState<Notif>(() => defaultSettings(user?.email).notificaciones);
+  const [preferencias, setPreferencias] = useState<Preferencias>(() => defaultSettings(user?.email).preferencias);
+  const [message, setMessage] = useState<string>("");
+  const [error, setError] = useState<string>("");
 
-  const [seguridad, setSeguridad] = useState({
-    actual: "",
-    nueva: "",
-    confirmar: "",
-  });
+  useEffect(() => {
+    if (!location.hash) return;
+    const targetId = location.hash.replace("#", "");
+    const el = document.getElementById(targetId);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash]);
 
-  const [notificaciones, setNotificaciones] = useState({
-    email: true,
-    push: true,
-    recordatorios: true,
-  });
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as { perfil: Perfil; notificaciones: Notif; preferencias: Preferencias };
+      setPerfil(parsed.perfil);
+      setNotificaciones(parsed.notificaciones);
+      setPreferencias(parsed.preferencias);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
-  const [preferencias, setPreferencias] = useState({
-    idioma: "es-CL",
-    zonaHoraria: "America/Santiago",
-  });
+  const persist = (data: { perfil: Perfil; notificaciones: Notif; preferencias: Preferencias }) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  };
+
+  const handleSavePerfil = () => {
+    if (!perfil.nombre || !perfil.correo) {
+      setError("Nombre y correo son obligatorios");
+      return;
+    }
+    const next = { perfil, notificaciones, preferencias };
+    persist(next);
+    setMessage("Perfil actualizado");
+    setError("");
+  };
+
+  const handleSaveSeguridad = () => {
+    if (!seguridad.nueva || seguridad.nueva !== seguridad.confirmar) {
+      setError("La nueva contrasena no coincide");
+      return;
+    }
+    setSeguridad({ actual: "", nueva: "", confirmar: "" });
+    setMessage("Contrasena actualizada (simulada)");
+    setError("");
+  };
+
+  const handleSaveNotificaciones = () => {
+    const next = { perfil, notificaciones, preferencias };
+    persist(next);
+    setMessage("Notificaciones guardadas");
+    setError("");
+  };
+
+  const handleSavePreferencias = () => {
+    const next = { perfil, notificaciones, preferencias };
+    persist(next);
+    setMessage("Preferencias guardadas");
+    setError("");
+  };
 
   return (
     <MainLayout>
@@ -48,7 +107,7 @@ export default function ConfiguracionPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Perfil */}
-        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+        <section id="perfil" className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
           <header className="flex items-center gap-3 mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-[#1A334B]">
               <Settings className="w-5 h-5" />
@@ -83,14 +142,17 @@ export default function ConfiguracionPage() {
           </div>
 
           <div className="mt-4">
-            <button className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition">
+            <button
+              onClick={handleSavePerfil}
+              className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition"
+            >
               Guardar perfil
             </button>
           </div>
         </section>
 
         {/* Seguridad */}
-        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+        <section id="seguridad" className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
           <header className="flex items-center gap-3 mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-[#1A334B]">
               <Lock className="w-5 h-5" />
@@ -123,14 +185,17 @@ export default function ConfiguracionPage() {
           </div>
 
           <div className="mt-4">
-            <button className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition">
+            <button
+              onClick={handleSaveSeguridad}
+              className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition"
+            >
               Guardar contrasena
             </button>
           </div>
         </section>
 
         {/* Notificaciones */}
-        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+        <section id="notificaciones" className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
           <header className="flex items-center gap-3 mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-[#1A334B]">
               <Bell className="w-5 h-5" />
@@ -153,21 +218,39 @@ export default function ConfiguracionPage() {
               onChange={(v) => setNotificaciones((n) => ({ ...n, push: v }))}
             />
             <Toggle
-              label="Recordatorios antes de reuniones o entregas"
+              label="Recordatorios antes de reuniones"
               value={notificaciones.recordatorios}
               onChange={(v) => setNotificaciones((n) => ({ ...n, recordatorios: v }))}
+            />
+            <Select
+              label="Minutos antes del evento"
+              value={String(notificaciones.minutosAntes)}
+              opciones={[
+                { value: "20", label: "20 minutos" },
+                { value: "30", label: "30 minutos" },
+                { value: "60", label: "60 minutos" },
+              ]}
+              onChange={(v) => setNotificaciones((n) => ({ ...n, minutosAntes: Number(v) }))}
+            />
+            <Toggle
+              label="Cerrar recordatorios al marcar reunion como entregada"
+              value={notificaciones.autoCerrar}
+              onChange={(v) => setNotificaciones((n) => ({ ...n, autoCerrar: v }))}
             />
           </div>
 
           <div className="mt-4">
-            <button className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition">
+            <button
+              onClick={handleSaveNotificaciones}
+              className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition"
+            >
               Guardar notificaciones
             </button>
           </div>
         </section>
 
         {/* Preferencias */}
-        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+        <section id="preferencias" className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
           <header className="flex items-center gap-3 mb-4">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-50 text-[#1A334B]">
               <Globe2 className="w-5 h-5" />
@@ -183,9 +266,9 @@ export default function ConfiguracionPage() {
               label="Idioma"
               value={preferencias.idioma}
               opciones={[
-                { value: "es-CL", label: "Espanol (Chile)" },
-                { value: "es-ES", label: "Espanol (Espana)" },
-                { value: "en-US", label: "Ingles" },
+                { value: "es", label: "Espanol" },
+                { value: "en", label: "Ingles" },
+                { value: "ko", label: "Koreano" },
               ]}
               onChange={(v) => setPreferencias((p) => ({ ...p, idioma: v }))}
             />
@@ -196,17 +279,28 @@ export default function ConfiguracionPage() {
                 { value: "America/Santiago", label: "America/Santiago" },
                 { value: "America/Argentina/Buenos_Aires", label: "Buenos Aires" },
                 { value: "UTC", label: "UTC" },
+                { value: "Asia/Seoul", label: "Asia/Seoul" },
+                { value: "Europe/Madrid", label: "Europe/Madrid" },
               ]}
               onChange={(v) => setPreferencias((p) => ({ ...p, zonaHoraria: v }))}
             />
           </div>
 
           <div className="mt-4">
-            <button className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition">
+            <button
+              onClick={handleSavePreferencias}
+              className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition"
+            >
               Guardar preferencias
             </button>
           </div>
         </section>
+
+        {(message || error) && (
+          <div className={`lg:col-span-2 p-3 rounded-lg border ${error ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+            {error || message}
+          </div>
+        )}
 
       </div>
     </MainLayout>

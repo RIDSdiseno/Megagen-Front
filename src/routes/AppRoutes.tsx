@@ -2,12 +2,17 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import DashboardHome from "../pages/DashboardHome";
 import Leads from "../pages/Leads";
+import ClientsPage from "../pages/Clients";
 import CalendarPage from "../pages/Calendar";
 import ForgotPasswordPage from "../pages/ForgotPassword";
 import CotizacionesPage from "../pages/Quotes";
 import UsuariosPage from "../pages/Users";
 import ConfiguracionPage from "../pages/Settings";
 import ProtectedRoute from "./ProtectedRoute";
+import { type Role } from "../context/AuthContext";
+
+const ALL_ROLES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
+const COMERCIALES: Role[] = ["admin", "superadmin", "supervisor", "vendedor"];
 
 export default function AppRoutes() {
   return (
@@ -21,7 +26,7 @@ export default function AppRoutes() {
       <Route 
         path="/dashboard" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={COMERCIALES}>
             <DashboardHome />
           </ProtectedRoute>
         } 
@@ -30,8 +35,17 @@ export default function AppRoutes() {
       <Route 
         path="/leads" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "vendedor"]}>
             <Leads />
+          </ProtectedRoute>
+        } 
+      />
+
+      <Route 
+        path="/clientes" 
+        element={
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "vendedor"]}>
+            <ClientsPage />
           </ProtectedRoute>
         } 
       />
@@ -39,7 +53,7 @@ export default function AppRoutes() {
       <Route 
         path="/calendar" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "vendedor"]}>
             <CalendarPage />
           </ProtectedRoute>
         } 
@@ -48,7 +62,7 @@ export default function AppRoutes() {
       <Route 
         path="/cotizaciones" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "bodeguero"]}>
             <CotizacionesPage />
           </ProtectedRoute>
         } 
@@ -57,7 +71,7 @@ export default function AppRoutes() {
       <Route 
         path="/usuarios" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["admin", "superadmin"]}>
             <UsuariosPage />
           </ProtectedRoute>
         } 
@@ -66,7 +80,7 @@ export default function AppRoutes() {
       <Route 
         path="/configuracion" 
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={ALL_ROLES}>
             <ConfiguracionPage />
           </ProtectedRoute>
         } 

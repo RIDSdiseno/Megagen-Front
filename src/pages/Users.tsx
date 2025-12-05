@@ -7,39 +7,49 @@ import {
   Ban,
   CheckCircle,
 } from "lucide-react";
+import { type Role, useAuth } from "../context/AuthContext";
 
 type Estado = "Activo" | "Pendiente" | "Suspendido";
-type Rol = "Administrador" | "Coordinador" | "Ventas" | "Clinica";
 
 type Usuario = {
   id: number;
   nombre: string;
   correo: string;
-  rol: Rol;
+  roles: Role[];
   estado: Estado;
   ultimoAcceso: string;
 };
 
-const usuariosData: Usuario[] = [
-  { id: 1, nombre: "Carolina Soto", correo: "carolina@megagen.cl", rol: "Administrador", estado: "Activo", ultimoAcceso: "2025-12-02 09:30" },
-  { id: 2, nombre: "Luis Herrera", correo: "luis.herrera@megagen.cl", rol: "Ventas", estado: "Pendiente", ultimoAcceso: "Pendiente" },
-  { id: 3, nombre: "Paula Rios", correo: "paula.rios@megagen.cl", rol: "Coordinador", estado: "Activo", ultimoAcceso: "2025-12-01 18:10" },
-  { id: 4, nombre: "Clinica Andes", correo: "contacto@andes.cl", rol: "Clinica", estado: "Suspendido", ultimoAcceso: "2025-11-30 12:00" },
-];
+const roleLabels: Record<Role, string> = {
+  admin: "Admin",
+  superadmin: "Super admin",
+  supervisor: "Supervisor",
+  vendedor: "Vendedor",
+  bodeguero: "Bodeguero",
+};
 
-const roles: Rol[] = ["Administrador", "Coordinador", "Ventas", "Clinica"];
+const rolesCatalog: Role[] = ["admin", "supervisor", "vendedor", "bodeguero"];
 const estados: Estado[] = ["Activo", "Pendiente", "Suspendido"];
 
+const usuariosData: Usuario[] = [
+  { id: 1, nombre: "Carolina Soto", correo: "carolina@megagen.cl", roles: ["superadmin", "admin"], estado: "Activo", ultimoAcceso: "2025-12-02 09:30" },
+  { id: 2, nombre: "Luis Herrera", correo: "luis.herrera@megagen.cl", roles: ["vendedor"], estado: "Pendiente", ultimoAcceso: "Pendiente" },
+  { id: 3, nombre: "Paula Rios", correo: "paula.rios@megagen.cl", roles: ["supervisor"], estado: "Activo", ultimoAcceso: "2025-12-01 18:10" },
+  { id: 4, nombre: "Bodega Central", correo: "bodega@megagen.cl", roles: ["bodeguero"], estado: "Activo", ultimoAcceso: "2025-11-30 12:00" },
+  { id: 5, nombre: "Equipo Hibrido", correo: "hibrido@megagen.cl", roles: ["vendedor", "bodeguero"], estado: "Activo", ultimoAcceso: "2025-12-03 08:00" },
+];
+
 export default function UsuariosPage() {
+  const { hasRole, impersonate } = useAuth();
   const [search, setSearch] = useState("");
-  const [filtroRol, setFiltroRol] = useState<Rol | "Todos">("Todos");
+  const [filtroRol, setFiltroRol] = useState<Role | "Todos">("Todos");
   const [filtroEstado, setFiltroEstado] = useState<Estado | "Todos">("Todos");
   const [usuarios, setUsuarios] = useState<Usuario[]>(usuariosData);
   const [showForm, setShowForm] = useState(false);
   const [nuevo, setNuevo] = useState<Omit<Usuario, "id">>({
     nombre: "",
     correo: "",
-    rol: "Ventas",
+    roles: ["vendedor"],
     estado: "Pendiente",
     ultimoAcceso: "Pendiente",
   });
@@ -58,7 +68,7 @@ export default function UsuariosPage() {
     const term = search.toLowerCase();
     return usuarios.filter((u) => {
       const matchTexto = u.nombre.toLowerCase().includes(term) || u.correo.toLowerCase().includes(term);
-      const matchRol = filtroRol === "Todos" ? true : u.rol === filtroRol;
+      const matchRol = filtroRol === "Todos" ? true : u.roles.includes(filtroRol);
       const matchEstado = filtroEstado === "Todos" ? true : u.estado === filtroEstado;
       return matchTexto && matchRol && matchEstado;
     });
@@ -68,8 +78,14 @@ export default function UsuariosPage() {
     setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, estado: nuevo } : u)));
   };
 
-  const cambiarRol = (id: number, nuevoRol: Rol) => {
-    setUsuarios((prev) => prev.map((u) => (u.id === id ? { ...u, rol: nuevoRol } : u)));
+  const toggleRol = (id: number, role: Role) => {
+    setUsuarios((prev) =>
+      prev.map((u) =>
+        u.id === id
+          ? { ...u, roles: u.roles.includes(role) ? u.roles.filter((r) => r !== role) : [...u.roles, role] }
+          : u
+      )
+    );
   };
 
   const eliminarUsuario = (id: number) => {
@@ -84,7 +100,7 @@ export default function UsuariosPage() {
     setNuevo({
       nombre: "",
       correo: "",
-      rol: "Ventas",
+      roles: ["vendedor"],
       estado: "Pendiente",
       ultimoAcceso: "Pendiente",
     });
@@ -97,6 +113,9 @@ export default function UsuariosPage() {
           <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Administracion</p>
           <h2 className="text-3xl font-extrabold text-[#1A334B]">Usuarios y permisos</h2>
           <p className="text-gray-600 text-sm">Gestiona cuentas, roles y accesos rapidamente.</p>
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 inline-block mt-1">
+            Admin / Super admin controlan todo. Supervisor audita. Vendedor solo Leads/Clientes/Calendario. Bodeguero solo Cotizaciones.
+          </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
@@ -127,7 +146,7 @@ export default function UsuariosPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Selector value={filtroRol} onChange={(v) => setFiltroRol(v as Rol | "Todos")} label="Rol" opciones={["Todos", ...roles]} />
+          <Selector value={filtroRol} onChange={(v) => setFiltroRol(v as Role | "Todos")} label="Rol" opciones={["Todos", ...rolesCatalog]} />
           <Selector value={filtroEstado} onChange={(v) => setFiltroEstado(v as Estado | "Todos")} label="Estado" opciones={["Todos", ...estados]} />
         </div>
       </div>
@@ -137,10 +156,11 @@ export default function UsuariosPage() {
           <thead className="bg-[#F5FAFF] text-[#1A334B] text-left">
             <tr>
               <th className="py-3 px-4 text-sm">Usuario</th>
-              <th className="py-3 px-4 text-sm">Rol</th>
+              <th className="py-3 px-4 text-sm">Roles</th>
               <th className="py-3 px-4 text-sm">Estado</th>
-              <th className="py-3 px-4 text-sm">Último acceso</th>
+              <th className="py-3 px-4 text-sm">Ultimo acceso</th>
               <th className="py-3 px-4 text-sm text-center">Acciones</th>
+              <th className="py-3 px-4 text-sm text-center">Conectarse como</th>
             </tr>
           </thead>
           <tbody>
@@ -151,15 +171,31 @@ export default function UsuariosPage() {
                   <p className="text-xs text-gray-500">{u.correo}</p>
                 </td>
                 <td className="py-3 px-4 text-sm text-gray-700">
-                  <select
-                    className="border border-[#D9E7F5] rounded-lg px-2 py-1 text-sm"
-                    value={u.rol}
-                    onChange={(e) => cambiarRol(u.id, e.target.value as Rol)}
-                  >
-                    {roles.map((rol) => (
-                      <option key={rol} value={rol}>{rol}</option>
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {u.roles.map((rol) => (
+                      <span key={rol} className="px-2 py-1 rounded-full bg-[#E6F0FB] text-[#1A334B] text-[11px] font-semibold">
+                        {roleLabels[rol]}
+                      </span>
                     ))}
-                  </select>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {rolesCatalog.map((rol) => {
+                      const active = u.roles.includes(rol);
+                      return (
+                        <button
+                          key={rol}
+                          onClick={() => toggleRol(u.id, rol)}
+                          className={`px-2 py-1 rounded-lg text-[11px] border transition ${
+                            active
+                              ? "bg-[#1A6CD3] text-white border-[#1A6CD3]"
+                              : "bg-white text-[#1A334B] border-[#D9E7F5] hover:bg-[#F4F8FD]"
+                          }`}
+                        >
+                          {roleLabels[rol]}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </td>
                 <td className="py-3 px-4">
                   <EstadoPill estado={u.estado} />
@@ -191,6 +227,16 @@ export default function UsuariosPage() {
                     />
                   </div>
                 </td>
+                <td className="py-3 px-4 text-center">
+                  {hasRole(["admin"]) && (
+                    <button
+                      onClick={() => impersonate({ email: u.correo, roles: u.roles })}
+                      className="text-[11px] px-3 py-2 rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+                    >
+                      Conectarse
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -208,16 +254,30 @@ export default function UsuariosPage() {
               <Input label="Nombre" value={nuevo.nombre} onChange={(v) => setNuevo({ ...nuevo, nombre: v })} />
               <Input label="Correo" value={nuevo.correo} onChange={(v) => setNuevo({ ...nuevo, correo: v })} />
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-[#1A334B]">Rol</span>
-                <select
-                  className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
-                  value={nuevo.rol}
-                  onChange={(e) => setNuevo({ ...nuevo, rol: e.target.value as Rol })}
-                >
-                  {roles.map((rol) => (
-                    <option key={rol} value={rol}>{rol}</option>
-                  ))}
-                </select>
+                <span className="text-xs font-semibold text-[#1A334B]">Roles</span>
+                <div className="flex flex-wrap gap-2">
+                  {rolesCatalog.map((rol) => {
+                    const active = nuevo.roles.includes(rol);
+                    return (
+                      <button
+                        key={rol}
+                        onClick={() =>
+                          setNuevo({
+                            ...nuevo,
+                            roles: active ? nuevo.roles.filter((r) => r !== rol) : [...nuevo.roles, rol],
+                          })
+                        }
+                        className={`px-3 py-2 rounded-lg text-xs font-semibold border transition ${
+                          active
+                            ? "bg-[#1A6CD3] text-white border-[#1A6CD3]"
+                            : "bg-white text-[#1A334B] border-[#D9E7F5] hover:bg-[#F4F8FD]"
+                        }`}
+                      >
+                        {roleLabels[rol]}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-semibold text-[#1A334B]">Estado</span>
@@ -231,7 +291,7 @@ export default function UsuariosPage() {
                   ))}
                 </select>
               </div>
-              <Input label="Último acceso" value={nuevo.ultimoAcceso} onChange={(v) => setNuevo({ ...nuevo, ultimoAcceso: v })} />
+              <Input label="Ultimo acceso" value={nuevo.ultimoAcceso} onChange={(v) => setNuevo({ ...nuevo, ultimoAcceso: v })} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -346,4 +406,3 @@ function BotonAccion({
     </button>
   );
 }
-
