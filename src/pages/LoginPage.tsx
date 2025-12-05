@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 const logoLogin = "/LogoLogin.jpg";
 
 export default function LoginPage() {
@@ -11,14 +12,31 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { setSession } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await login(email, password);
+      // Llamado directo a la API usando la variable de entorno VITE_API_URL
+      const resp = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!resp.ok) {
+        const errJson = await resp.json().catch(() => ({}));
+        throw new Error(errJson.message || "Credenciales incorrectas");
+      }
+      const data = (await resp.json()) as { token: string; user: { email: string; role?: string; roles?: string[] } };
+      const roles = Array.isArray(data.user.roles)
+        ? data.user.roles
+        : data.user.role
+        ? [data.user.role]
+        : [];
+      setSession({ email: data.user.email, roles: roles as any, token: data.token });
+
       const stored = localStorage.getItem("user");
       if (stored) {
         const parsed = JSON.parse(stored) as { roles?: string[] };

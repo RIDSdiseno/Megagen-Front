@@ -16,6 +16,7 @@ type AuthContextType = {
   hasRole: (roles: Role | Role[]) => boolean;
   impersonate: (payload: { email: string; roles: Role[]; token?: string }) => void;
   exitImpersonation: () => void;
+  setSession: (payload: { email: string; roles: Role[]; token: string; impersonator?: User["impersonator"] }) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,9 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? [data.user.role as Role]
       : [];
     const newUser: User = { email: data.user.email, roles, token: data.token };
-    localStorage.setItem("user", JSON.stringify(newUser));
-    localStorage.removeItem("impersonator");
-    setUser(newUser);
+    setSession(newUser);
   };
 
   const logout = () => {
@@ -72,6 +71,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("impersonator");
     setUser(null);
     window.location.href = "/login";
+  };
+
+  const setSession = (payload: { email: string; roles: Role[]; token: string; impersonator?: User["impersonator"] }) => {
+    const nextUser: User = {
+      email: payload.email,
+      roles: payload.roles,
+      token: payload.token,
+      impersonator: payload.impersonator,
+    };
+    localStorage.setItem("user", JSON.stringify(nextUser));
+    if (!payload.impersonator) localStorage.removeItem("impersonator");
+    setUser(nextUser);
   };
 
   const hasRole = (roles: Role | Role[]) => {
@@ -109,7 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hasRole, impersonate, exitImpersonation }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        logout,
+        hasRole,
+        impersonate,
+        exitImpersonation,
+        setSession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
