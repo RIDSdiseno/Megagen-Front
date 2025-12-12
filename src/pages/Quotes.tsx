@@ -80,12 +80,17 @@ export default function CotizacionesPage() {
     [user?.roles]
   );
 
-  const authHeaders = useMemo(() => (user?.token ? { Authorization: `Bearer ${user.token}` } : {}), [user?.token]);
+  const authHeaders = useMemo<Record<string, string>>(() => {
+    const headers: Record<string, string> = {};
+    if (user?.token) headers.Authorization = `Bearer ${user.token}`;
+    return headers;
+  }, [user?.token]);
 
-  const jsonHeaders = useMemo(() => {
-    const h: Record<string, string> = { "Content-Type": "application/json" };
-    return { ...h, ...authHeaders };
-  }, [authHeaders]);
+  const jsonHeaders = useMemo<Record<string, string>>(() => {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (user?.token) headers.Authorization = `Bearer ${user.token}`;
+    return headers;
+  }, [user?.token]);
 
   const fetchQuotes = async () => {
     setLoading(true);
@@ -1051,5 +1056,3 @@ function Input({
     </label>
   );
 }
-
-

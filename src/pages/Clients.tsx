@@ -1,4 +1,5 @@
 import MainLayout from "../components/MainLayout";
+import Modal from "../components/Modal";
 import { useMemo, useState } from "react";
 import { Search, PhoneCall, Mail, UserCircle2, MessageSquare, CalendarClock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
