@@ -5,6 +5,8 @@ import { Search, UserPlus, PhoneCall, MessageSquare, Mail, Globe2, Eye, Bell } f
 import { useAuth } from "../context/AuthContext";
 import { pushNotification } from "../utils/notifications";
 import { addEvent } from "../utils/events";
+import { useI18n } from "../context/I18nContext";
+import { vendorById, findVendorByEmail } from "../utils/vendors";
 
 type Lead = {
   id: number;
@@ -17,7 +19,7 @@ type Lead = {
   origen: "WhatsApp" | "Llamada" | "Correo" | "Instagram" | "Web";
   nota?: string;
   resumen?: string;
-  ownerEmail: string;
+  vendorId: number;
 };
 
 const estadoOrden: Lead["estado"][] = ["Nuevo", "Cotizando", "En Proceso", "Confirmado"];
@@ -34,7 +36,7 @@ const leadsData: Lead[] = [
     proximoPaso: "Enviar mensaje de bienvenida y coordinar llamada inicial.",
     origen: "WhatsApp",
     nota: "Pidio info de implantes premium",
-    ownerEmail: "luis.herrera@megagen.cl",
+    vendorId: 1,
   },
   {
     id: 2,
@@ -46,7 +48,7 @@ const leadsData: Lead[] = [
     proximoPaso: "Compartir cotizacion actualizada con descuentos.",
     origen: "Correo",
     nota: "Solicita descuentos por volumen",
-    ownerEmail: "luis.herrera@megagen.cl",
+    vendorId: 1,
   },
   {
     id: 3,
@@ -58,7 +60,7 @@ const leadsData: Lead[] = [
     proximoPaso: "Confirmar fecha de reunion con especialista.",
     origen: "Instagram",
     nota: "Vio campa-a de guias quirurgicas",
-    ownerEmail: "paula.rios@megagen.cl",
+    vendorId: 2,
   },
   {
     id: 4,
@@ -70,15 +72,18 @@ const leadsData: Lead[] = [
     proximoPaso: "Enviar resumen y documentacion previa a la cita.",
     origen: "Llamada",
     nota: "Quiere agendar instalacion in situ",
-    ownerEmail: "paula.rios@megagen.cl",
+    vendorId: 2,
   },
 ];
 
 export default function Leads() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<Lead["estado"] | "Todos">("Todos");
   const [origenFiltro, setOrigenFiltro] = useState<Lead["origen"] | "Todos">("Todos");
+  const [vendedorFiltro, setVendedorFiltro] = useState<string | "Todos">("Todos");
+  const [vistaVendedor, setVistaVendedor] = useState<string | null>(null);
   const [vista, setVista] = useState<"cards" | "tabla">("cards");
   const [leads, setLeads] = useState<Lead[]>(leadsData);
   const [showForm, setShowForm] = useState(false);
@@ -87,6 +92,8 @@ export default function Leads() {
   const [agendaFecha, setAgendaFecha] = useState("");
   const [agendaCanal, setAgendaCanal] = useState<"WhatsApp" | "Correo" | "Llamada">("WhatsApp");
   const [agendaNota, setAgendaNota] = useState("");
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [buscadorVendedor, setBuscadorVendedor] = useState("");
   const [nuevo, setNuevo] = useState<Omit<Lead, "id">>({
     nombre: "",
     telefono: "",
@@ -96,16 +103,17 @@ export default function Leads() {
     proximoPaso: "",
     origen: "WhatsApp",
     nota: "",
-    ownerEmail: user?.email ?? "ventas@megagen.cl",
+    vendorId: findVendorByEmail(user?.email)?.id ?? 1,
   });
 
   const isAdminLike = user?.roles?.some((r) => r === "admin" || r === "superadmin" || r === "supervisor") ?? false;
   const isVendedorSolo = (user?.roles?.includes("vendedor") ?? false) && !isAdminLike;
 
-  const leadsVisibles = useMemo(
-    () => (isVendedorSolo ? leads.filter((l) => l.ownerEmail === user?.email) : leads),
-    [isVendedorSolo, leads, user?.email]
-  );
+  const leadsVisibles = useMemo(() => {
+    if (!isVendedorSolo) return leads;
+    const vendor = findVendorByEmail(user?.email);
+    return vendor ? leads.filter((l) => l.vendorId === vendor.id) : [];
+  }, [isVendedorSolo, leads, user?.email]);
 
   const resumen = useMemo(
     () => estadoOrden.map(estado => ({
@@ -115,7 +123,24 @@ export default function Leads() {
     [leadsVisibles]
   );
 
+  const vendedores = useMemo(
+    () => Array.from(new Set(leadsVisibles.map((l) => l.vendorId))).filter(Boolean),
+    [leadsVisibles]
+  );
+
+  const resumenPorVendedor = useMemo(
+    () =>
+      vendedores.map((vendorId) => ({
+        vendorId,
+        vendor: vendorById[vendorId],
+        total: leadsVisibles.filter((l) => l.vendorId === vendorId).length,
+      })),
+    [vendedores, leadsVisibles]
+  );
+
   const filtered = useMemo(() => {
+    const vendedorObjetivo =
+      vistaVendedor ?? (vendedorFiltro === "Todos" ? null : (vendedorFiltro as string));
     return leadsVisibles.filter(l => {
       const term = search.toLowerCase();
       const matchTexto =
@@ -124,9 +149,13 @@ export default function Leads() {
         l.correo.toLowerCase().includes(term);
       const matchEstado = estadoFiltro === "Todos" ? true : l.estado === estadoFiltro;
       const matchOrigen = origenFiltro === "Todos" ? true : l.origen === origenFiltro;
-      return matchTexto && matchEstado && matchOrigen;
+      const vendor = vendorById[l.vendorId];
+      const matchVend = vendedorObjetivo
+        ? vendor?.email === vendedorObjetivo || l.vendorId === Number(vendedorObjetivo)
+        : true;
+      return matchTexto && matchEstado && matchOrigen && matchVend;
     });
-  }, [search, estadoFiltro, origenFiltro, leadsVisibles]);
+  }, [search, estadoFiltro, origenFiltro, leadsVisibles, vendedorFiltro, vistaVendedor]);
 
   const resumenOrigen = useMemo(() => {
     return origenes.map((origen) => ({
@@ -134,6 +163,8 @@ export default function Leads() {
       total: leadsVisibles.filter((l) => l.origen === origen).length,
     }));
   }, [leadsVisibles]);
+
+  const vendedoresLista = useMemo(() => vendedores.map((id) => vendorById[id]).filter(Boolean), [vendedores]);
 
   const crearRecordatorio = () => {
     if (!agendaLead || !agendaFecha) return;
@@ -148,7 +179,7 @@ export default function Leads() {
       telefono: agendaLead.telefono,
       estado: agendaLead.estado,
       resumen: agendaLead.proximoPaso || agendaLead.nota || "",
-      ownerEmail: user?.email,
+      ownerEmail: vendorById[agendaLead.vendorId]?.email || user?.email,
     });
     pushNotification({
       title: `Contacto con ${agendaLead.nombre}`,
@@ -187,7 +218,7 @@ export default function Leads() {
       proximoPaso: "",
       origen: "WhatsApp",
       nota: "",
-      ownerEmail: user?.email ?? "ventas@megagen.cl",
+      vendorId: findVendorByEmail(user?.email)?.id ?? 1,
     });
   };
 
@@ -212,20 +243,61 @@ export default function Leads() {
           </button>
         </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {resumen.map(item => (
-          <div
-            key={item.estado}
-            className="bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5"
-          >
-            <p className="text-xs font-semibold text-gray-500">{item.estado}</p>
-            <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
-            <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
-              <span className="block h-full bg-[#1A6CD3] transition-all" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {resumen.map(item => (
+            <div
+              key={item.estado}
+              className="bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5"
+            >
+              <p className="text-xs font-semibold text-gray-500">{item.estado}</p>
+              <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
+              <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
+                <span className="block h-full bg-[#1A6CD3] transition-all" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
+              </div>
             </div>
+          ))}
+        </div>
+
+      {isAdminLike && (
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-col gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-sm font-semibold text-[#1A334B]">{t("selectVendor")}</div>
+            <button
+              className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-[#1A334B] bg-white hover:bg-[#F4F8FD] shadow-sm"
+              onClick={() => setShowVendorModal(true)}
+            >
+              {vendedorFiltro === "Todos" ? t("all") : vendorById[Number(vendedorFiltro)]?.nombre || vendedorFiltro}
+            </button>
+            {vistaVendedor && (
+              <button
+                className="px-3 py-2 text-xs font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+                onClick={() => setVistaVendedor(null)}
+              >
+                Volver a vista general
+              </button>
+            )}
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            {resumenPorVendedor.map((v) => {
+              const active = vistaVendedor === v.vendor?.email;
+              return (
+                <button
+                  key={v.vendorId}
+                  onClick={() => setVistaVendedor(active ? null : v.vendor?.email || String(v.vendorId))}
+                  className={`text-left px-3 py-2 rounded-lg border text-sm ${
+                    active
+                      ? "border-[#1A6CD3] bg-[#E6F0FB] text-[#0E4B8F]"
+                      : "border-[#D9E7F5] bg-white text-[#1A334B] hover:bg-[#F4F8FD]"
+                  }`}
+                >
+                  <p className="font-semibold">{v.vendor?.nombre || v.vendor?.email}</p>
+                  <p className="text-xs text-gray-600">{v.total} leads</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {resumenOrigen.map((item) => (
@@ -297,7 +369,9 @@ export default function Leads() {
           {filtered.map(lead => (
             <div
               key={lead.id}
-              className="bg-white border border-[#E3ECF7] rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1"
+              className={`rounded-2xl p-4 shadow-sm hover:shadow-xl transition-all hover:-translate-y-1 border ${
+                lead.estado === "Confirmado" ? "bg-[#E8F1FF] border-[#C9DEFF]" : "bg-white border-[#E3ECF7]"
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -305,11 +379,11 @@ export default function Leads() {
                   <h3 className="text-xl font-bold text-[#1A334B]">{lead.nombre}</h3>
                   <p className="text-sm text-gray-600">{lead.correo}</p>
                   <p className="text-sm text-gray-600">{lead.telefono}</p>
-                  <p className="text-xs text-[#1A6CD3] font-semibold mt-1">Origen: {lead.origen}</p>
+                  <p className="text-xs text-[#1A6CD3] font-semibold mt-1">
+                    Vendedor: {vendorById[lead.vendorId]?.nombre || vendorById[lead.vendorId]?.email} · Origen: {lead.origen}
+                  </p>
                 </div>
-                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-[#E6F0FB] text-[#1A6CD3]">
-                  {lead.estado}
-                </span>
+                <EstadoBadge estado={lead.estado} />
               </div>
 
               <div className="mt-3 text-sm text-gray-700 bg-[#F7FAFF] border border-[#D9E7F5] rounded-xl p-3">
@@ -353,6 +427,18 @@ export default function Leads() {
                 icon={<Bell size={16} />}
                 label="Agendar"
               />
+              <AccionBoton
+                onClick={() => {
+                  pushNotification({
+                    title: `Recordar: ${lead.nombre}`,
+                    detail: lead.proximoPaso || lead.nota || "Revisar comentarios del cliente",
+                    time: new Date().toLocaleString("es-CL"),
+                  });
+                }}
+                color="bg-[#F0E8FF] text-purple-700 hover:bg-[#e6dbff]"
+                icon={<Bell size={16} />}
+                label="Recordar"
+              />
             </div>
           </div>
         ))}
@@ -379,7 +465,7 @@ export default function Leads() {
                     <p className="text-xs text-gray-500">{lead.telefono}</p>
                   </td>
                   <td className="py-3 px-4 text-sm">
-                    <span className="px-2 py-1 rounded-full text-xs font-semibold bg-[#E6F0FB] text-[#1A6CD3]">{lead.estado}</span>
+                    <EstadoBadge estado={lead.estado} />
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-700">{lead.origen}</td>
                   <td className="py-3 px-4 text-sm text-gray-700">{lead.fechaIngreso}</td>
@@ -422,6 +508,18 @@ export default function Leads() {
                         icon={<Bell size={16} />}
                         label="Agendar"
                       />
+                      <AccionBoton
+                        onClick={() =>
+                          pushNotification({
+                            title: `Recordar: ${lead.nombre}`,
+                            detail: lead.proximoPaso || lead.nota || "Revisar comentarios del cliente",
+                            time: new Date().toLocaleString("es-CL"),
+                          })
+                        }
+                        color="bg-[#F0E8FF] text-purple-700 hover:bg-[#e6dbff]"
+                        icon={<Bell size={16} />}
+                        label="Recordar"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -429,6 +527,63 @@ export default function Leads() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {showVendorModal && (
+        <Modal onClose={() => setShowVendorModal(false)}>
+          <div className="p-5 space-y-3">
+            <h3 className="text-xl font-bold text-[#1A334B]">Seleccionar vendedor</h3>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o email..."
+              value={buscadorVendedor}
+              onChange={(e) => setBuscadorVendedor(e.target.value)}
+              className="w-full border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
+            />
+            <div className="max-h-64 overflow-auto divide-y divide-gray-100">
+              <button
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  vendedorFiltro === "Todos" ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                }`}
+                onClick={() => {
+                  setVendedorFiltro("Todos");
+                  setShowVendorModal(false);
+                }}
+              >
+                Todos
+              </button>
+              {vendedoresLista
+                .filter((v) => {
+                  const term = buscadorVendedor.toLowerCase();
+                  return (v?.nombre || "").toLowerCase().includes(term) || (v?.email || "").toLowerCase().includes(term);
+                })
+                .map((v) => (
+                  <button
+                    key={v?.id}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      vendedorFiltro === String(v?.id) ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                    }`}
+                    onClick={() => {
+                      if (!v) return;
+                      setVendedorFiltro(String(v.id));
+                      setShowVendorModal(false);
+                    }}
+                  >
+                    <p className="font-semibold">{v?.nombre}</p>
+                    <p className="text-xs text-gray-500">{v?.email}</p>
+                  </button>
+                ))}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowVendorModal(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {showForm && (
@@ -657,3 +812,14 @@ function EstadoChip({
     </button>
   );
 }
+
+function EstadoBadge({ estado }: { estado: Lead["estado"] }) {
+  const isCliente = estado === "Confirmado";
+  const bg = isCliente ? "bg-[#E6F0FB] text-[#1A6CD3] border-[#D9E7F5]" : "bg-[#F4E8FF] text-[#6B21A8] border-[#E9D5FF]";
+  return (
+    <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${bg}`}>
+      {estado}
+    </span>
+  );
+}
+

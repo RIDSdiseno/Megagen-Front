@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 import { Bell, ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { clearNotifications, getNotifications, removeNotification, type NotificationItem } from "../utils/notifications";
+import { useI18n } from "../context/I18nContext";
 
 export default function Topbar() {
   const { user, logout, exitImpersonation } = useAuth();
+  const { lang, setLanguage, t } = useI18n();
   const [openMenu, setOpenMenu] = useState(false);
   const [openNotif, setOpenNotif] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -23,9 +25,21 @@ export default function Topbar() {
   return (
     <header className="backdrop-blur bg-white/80 border-b border-gray-200 px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-40">
 
-      <h2 className="font-bold text-[#1A334B] text-lg tracking-tight">
-        MegaGen CRM - Plataforma Comercial Chile
-      </h2>
+      <div className="flex items-center gap-3">
+        <h2 className="font-bold text-[#1A334B] text-lg tracking-tight">
+          {t("crmTitle")} - {t("platformSubtitle")}
+        </h2>
+        <select
+          value={lang}
+          onChange={(e) => setLanguage(e.target.value as any)}
+          className="text-xs border border-[#D9E7F5] rounded-lg px-2 py-1 text-[#1A334B] bg-white"
+          aria-label={t("language")}
+        >
+          <option value="es">ES</option>
+          <option value="en">EN</option>
+          <option value="ko">KO</option>
+        </select>
+      </div>
 
       <div className="flex items-center gap-3 relative">
 
@@ -113,7 +127,7 @@ export default function Topbar() {
                   navigate("/configuracion#seguridad");
                 }}
               >
-                Cambiar contrasena
+                {t("changePassword")}
               </button>
 
               <button
@@ -123,7 +137,7 @@ export default function Topbar() {
                   navigate("/configuracion");
                 }}
               >
-                Configuracion
+                {t("config")}
               </button>
 
               {user?.impersonator && (
@@ -142,7 +156,7 @@ export default function Topbar() {
                 className="w-full text-left px-4 py-3 hover:bg-gray-100 text-red-600 font-semibold transition"
                 onClick={logout}
               >
-              Cerrar sesion
+              {t("logout")}
               </button>
             </div>
           )}

@@ -1,21 +1,23 @@
 import { NavLink } from "react-router-dom";
 import Logo from "/LOGO.jpg";
-import { 
-  LayoutDashboard, 
-  Users, 
-  Calendar, 
-  FileText, 
-  Settings, 
-  UserCog, 
-  Shield 
+import {
+  LayoutDashboard,
+  Users,
+  Calendar,
+  FileText,
+  Settings,
+  UserCog,
+  Shield,
 } from "lucide-react";
 import { useAuth, type Role } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 const linkClass =
   "flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-megagen-primary/10 text-[#1A334B] font-semibold";
 
 export default function Sidebar() {
   const { hasRole } = useAuth();
+  const { t } = useI18n();
 
   const items: Array<{
     to: string;
@@ -23,13 +25,13 @@ export default function Sidebar() {
     icon: React.ComponentType<{ size?: number }>;
     roles?: Role[];
   }> = [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
-    { to: "/leads", label: "Leads", icon: Users, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
-    { to: "/clientes", label: "Clientes", icon: UserCog, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
-    { to: "/calendar", label: "Calendario y Reuniones", icon: Calendar, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
-    { to: "/cotizaciones", label: "Cotizaciones", icon: FileText, roles: ["admin", "superadmin", "supervisor", "bodeguero"] },
-    { to: "/usuarios", label: "Usuarios", icon: Shield, roles: ["admin", "superadmin"] },
-    { to: "/configuracion", label: "Configuracion", icon: Settings },
+    { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, roles: ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"] },
+    { to: "/leads", label: t("leads"), icon: Users, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/clientes", label: t("clients"), icon: UserCog, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/calendar", label: t("calendar"), icon: Calendar, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/cotizaciones", label: t("quotes"), icon: FileText, roles: ["admin", "superadmin", "supervisor", "bodeguero"] },
+    { to: "/usuarios", label: t("users"), icon: Shield, roles: ["admin", "superadmin"] },
+    { to: "/configuracion", label: t("settings"), icon: Settings },
   ];
 
   const canSee = (roles?: Role[]) => {

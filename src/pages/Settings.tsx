@@ -3,6 +3,7 @@ import MainLayout from "../components/MainLayout";
 import { Settings, Shield, Bell, Globe2, Lock } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 type Perfil = { nombre: string; correo: string; telefono: string; empresa: string };
 type Seguridad = { actual: string; nueva: string; confirmar: string };
@@ -19,6 +20,7 @@ const defaultSettings = (email: string | undefined) => ({
 
 export default function ConfiguracionPage() {
   const { user } = useAuth();
+  const { lang, setLanguage, t } = useI18n();
   const location = useLocation();
   const [perfil, setPerfil] = useState<Perfil>(() => defaultSettings(user?.email).perfil);
   const [seguridad, setSeguridad] = useState<Seguridad>({ actual: "", nueva: "", confirmar: "" });
@@ -90,7 +92,7 @@ export default function ConfiguracionPage() {
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Configuracion</p>
+          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("settings")}</p>
           <h2 className="text-3xl font-extrabold text-[#1A334B]">Preferencias de usuario</h2>
           <p className="text-gray-600 text-sm">
             Gestiona perfil, seguridad y notificaciones desde un solo lugar.
@@ -264,13 +266,17 @@ export default function ConfiguracionPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Idioma"
-              value={preferencias.idioma}
+              value={lang}
               opciones={[
                 { value: "es", label: "Espanol" },
                 { value: "en", label: "Ingles" },
                 { value: "ko", label: "Koreano" },
               ]}
-              onChange={(v) => setPreferencias((p) => ({ ...p, idioma: v }))}
+              onChange={(v) => {
+                setLanguage(v as any);
+                setPreferencias((p) => ({ ...p, idioma: v }));
+                persist({ perfil, notificaciones, preferencias: { ...preferencias, idioma: v } });
+              }}
             />
             <Select
               label="Zona horaria"

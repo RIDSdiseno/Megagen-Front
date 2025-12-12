@@ -4,6 +4,8 @@ import { Search, PhoneCall, Mail, UserCircle2, MessageSquare, CalendarClock } fr
 import { useAuth } from "../context/AuthContext";
 import { pushNotification } from "../utils/notifications";
 import { addEvent } from "../utils/events";
+import { useI18n } from "../context/I18nContext";
+import { vendorById, findVendorByEmail } from "../utils/vendors";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
@@ -12,8 +14,7 @@ type Cliente = {
   nombre: string;
   correo: string;
   telefono: string;
-  vendedor: string;
-  vendedorEmail: string;
+  vendorId: number;
   estado: "Activo" | "Onboarding" | "En riesgo";
   origen: "Leads" | "Referido" | "Marketplace";
   resumen: string;
@@ -25,8 +26,7 @@ const clientesData: Cliente[] = [
     nombre: "Clinica Smile",
     correo: "contacto@smile.cl",
     telefono: "+56987654321",
-    vendedor: "Luis Herrera",
-    vendedorEmail: "vendedor@megagen.cl",
+    vendorId: 1,
     estado: "Activo",
     origen: "Leads",
     resumen: "Compra mensual de implantes premium y kits quirurgicos.",
@@ -36,8 +36,7 @@ const clientesData: Cliente[] = [
     nombre: "OdontoPlus SPA",
     correo: "contacto@odontoplus.cl",
     telefono: "+56961188899",
-    vendedor: "Paula Rios",
-    vendedorEmail: "vendedor.sur@megagen.cl",
+    vendorId: 2,
     estado: "Onboarding",
     origen: "Referido",
     resumen: "En rollout de protocolos y catalogos digitales.",
@@ -47,8 +46,7 @@ const clientesData: Cliente[] = [
     nombre: "Centro Andes",
     correo: "info@andes.cl",
     telefono: "+56223440011",
-    vendedor: "Supervisor Norte",
-    vendedorEmail: "supervisor.norte@megagen.cl",
+    vendorId: 3,
     estado: "En riesgo",
     origen: "Leads",
     resumen: "Esperando renovacion de contrato anual y stock critico.",
@@ -58,8 +56,7 @@ const clientesData: Cliente[] = [
     nombre: "SmileLab",
     correo: "hola@smilelab.cl",
     telefono: "+56990001122",
-    vendedor: "Carolina Soto",
-    vendedorEmail: "carolina@megagen.cl",
+    vendorId: 2,
     estado: "Activo",
     origen: "Marketplace",
     resumen: "Laboratorio que compra por lote trimestral.",
@@ -69,8 +66,7 @@ const clientesData: Cliente[] = [
     nombre: "Clinica BioSalud",
     correo: "contacto@biosalud.cl",
     telefono: "+56975553344",
-    vendedor: "Admin MegaGen",
-    vendedorEmail: "admin@megagen.cl",
+    vendorId: 4,
     estado: "Activo",
     origen: "Referido",
     resumen: "Cliente B2B con foco en reposicion rapida de insumos.",
@@ -80,8 +76,7 @@ const clientesData: Cliente[] = [
     nombre: "Dental Vision",
     correo: "hola@dentalvision.cl",
     telefono: "+56965554433",
-    vendedor: "Supervisor MegaGen",
-    vendedorEmail: "supervisor@megagen.cl",
+    vendorId: 3,
     estado: "Onboarding",
     origen: "Leads",
     resumen: "Requiere capacitacion inicial y agenda de demos.",
@@ -92,23 +87,41 @@ const estados: Cliente["estado"][] = ["Activo", "Onboarding", "En riesgo"];
 
 export default function ClientsPage() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<Cliente["estado"] | "Todos">("Todos");
-  const [vendedorFiltro, setVendedorFiltro] = useState<string | "Todos">("Todos");
+  const [vendedorFiltro, setVendedorFiltro] = useState<number | "Todos">("Todos");
+  const [vistaVendedor, setVistaVendedor] = useState<number | null>(null);
   const [agendaCliente, setAgendaCliente] = useState<Cliente | null>(null);
   const [agendaFecha, setAgendaFecha] = useState("");
   const [agendaNota, setAgendaNota] = useState("");
   const [agendaBusqueda, setAgendaBusqueda] = useState("");
+  const [showVendorModal, setShowVendorModal] = useState(false);
+  const [buscadorVendedor, setBuscadorVendedor] = useState("");
 
   const isAdminLike = user?.roles?.some((r) => r === "admin" || r === "superadmin" || r === "supervisor") ?? false;
   const isVendedorSolo = (user?.roles?.includes("vendedor") ?? false) && !isAdminLike;
 
   const clientesBase = useMemo(
-    () => (isVendedorSolo ? clientesData.filter((c) => c.vendedorEmail === user?.email) : clientesData),
+    () => {
+      if (!isVendedorSolo) return clientesData;
+      const vendor = findVendorByEmail(user?.email);
+      return vendor ? clientesData.filter((c) => c.vendorId === vendor.id) : [];
+    },
     [isVendedorSolo, user?.email]
   );
 
-  const vendedores = useMemo(() => Array.from(new Set(clientesBase.map((c) => c.vendedor))), [clientesBase]);
+  const vendedores = useMemo(() => Array.from(new Set(clientesBase.map((c) => c.vendorId))), [clientesBase]);
+
+  const resumenPorVendedor = useMemo(
+    () =>
+      vendedores.map((vId) => ({
+        vendorId: vId,
+        total: clientesBase.filter((c) => c.vendorId === vId).length,
+        vendor: vendorById[vId],
+      })),
+    [vendedores, clientesBase]
+  );
 
   const resumen = useMemo(() => {
     return {
@@ -121,17 +134,19 @@ export default function ClientsPage() {
 
   const filtrados = useMemo(() => {
     const term = search.toLowerCase();
+    const vendedorObjetivo =
+      vistaVendedor ?? (vendedorFiltro === "Todos" ? null : Number(vendedorFiltro));
     return clientesBase.filter((c) => {
       const matchTexto =
         c.nombre.toLowerCase().includes(term) ||
         c.correo.toLowerCase().includes(term) ||
         c.telefono.includes(term) ||
-        c.vendedor.toLowerCase().includes(term);
+        vendorById[c.vendorId]?.nombre.toLowerCase().includes(term);
       const matchEstado = estadoFiltro === "Todos" ? true : c.estado === estadoFiltro;
-      const matchVend = vendedorFiltro === "Todos" ? true : c.vendedor === vendedorFiltro;
+      const matchVend = vendedorObjetivo ? c.vendorId === vendedorObjetivo : true;
       return matchTexto && matchEstado && matchVend;
     });
-  }, [search, estadoFiltro, vendedorFiltro, clientesBase]);
+  }, [search, estadoFiltro, vendedorFiltro, clientesBase, vistaVendedor]);
 
   const candidatosAgenda = useMemo(() => {
     const term = agendaBusqueda.toLowerCase();
@@ -157,7 +172,7 @@ export default function ClientsPage() {
       paciente: agendaCliente.nombre,
       telefono: agendaCliente.telefono,
       estado: "Confirmado",
-      ownerEmail: user?.email,
+      ownerEmail: vendorById[agendaCliente.vendorId]?.email || user?.email,
     });
 
     (async () => {
@@ -185,7 +200,7 @@ export default function ClientsPage() {
 
     pushNotification({
       title: `Reunion con ${agendaCliente.nombre}`,
-      detail: `Cliente de ${agendaCliente.vendedor}. ${agendaNota ? agendaNota + " - " : ""}${fechaLegible}`,
+      detail: `Cliente de ${vendorById[agendaCliente.vendorId]?.nombre || "Sin asignar"}. ${agendaNota ? agendaNota + " - " : ""}${fechaLegible}`,
       time: fechaLegible,
     });
     setAgendaCliente(null);
@@ -242,10 +257,121 @@ export default function ClientsPage() {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Filter value={estadoFiltro} onChange={setEstadoFiltro} label="Estado" opciones={["Todos", ...estados]} />
-          <Filter value={vendedorFiltro} onChange={setVendedorFiltro} label="Vendedor" opciones={["Todos", ...vendedores]} />
+          <Filter
+            value={estadoFiltro}
+            onChange={setEstadoFiltro}
+            label="Estado"
+            opciones={["Todos", ...estados]}
+          />
+          <button
+            onClick={() => setShowVendorModal(true)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] bg-white hover:bg-[#F4F8FD] shadow-sm"
+          >
+            Vendedor
+            <span className="px-2 py-1 rounded-full text-[11px] bg-[#E6F0FB] text-[#1A6CD3]">
+              {vendedorFiltro === "Todos" ? "Todos" : vendorById[vendedorFiltro]?.nombre || vendedorFiltro}
+            </span>
+          </button>
         </div>
       </div>
+
+      {isAdminLike && (
+        <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-wrap gap-2 items-center mb-4">
+          <span className="text-sm font-semibold text-[#1A334B]">{t("selectVendor")}:</span>
+          <button
+            onClick={() => setShowVendorModal(true)}
+            className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-[#1A334B] bg-white hover:bg-[#F4F8FD] shadow-sm"
+          >
+            {vendedorFiltro === "Todos" ? t("all") : vendorById[Number(vendedorFiltro)]?.nombre || vendedorFiltro}
+          </button>
+          {vistaVendedor && (
+            <button
+              className="px-3 py-2 text-xs font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              onClick={() => setVistaVendedor(null)}
+            >
+              Volver a vista general
+            </button>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 w-full">
+            {resumenPorVendedor.map((v) => {
+              const active = vistaVendedor === v.vendorId;
+              return (
+                <button
+                  key={v.vendorId}
+                  onClick={() => setVistaVendedor(active ? null : v.vendorId)}
+                  className={`text-left px-3 py-2 rounded-lg border text-sm shadow-sm ${
+                    active
+                      ? "border-[#1A6CD3] bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
+                      : "border-[#D9E7F5] bg-white text-[#1A334B] hover:bg-[#F4F8FD]"
+                  }`}
+                >
+                  <p className="font-semibold">{v.vendor?.nombre || v.vendor?.email}</p>
+                  <p className="text-xs text-gray-600">{v.total} clientes</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showVendorModal && (
+        <Modal onClose={() => setShowVendorModal(false)}>
+          <div className="p-5 space-y-3">
+            <h3 className="text-xl font-bold text-[#1A334B]">Seleccionar vendedor</h3>
+            <input
+              type="text"
+              placeholder="Buscar por nombre o email..."
+              value={buscadorVendedor}
+              onChange={(e) => setBuscadorVendedor(e.target.value)}
+              className="w-full border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
+            />
+            <div className="max-h-64 overflow-auto divide-y divide-gray-100">
+              <button
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  vendedorFiltro === "Todos" ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                }`}
+                onClick={() => {
+                  setVendedorFiltro("Todos");
+                  setShowVendorModal(false);
+                }}
+              >
+                Todos
+              </button>
+              {vendedores
+                .map((v) => vendorById[v])
+                .filter(Boolean)
+                .filter((v) => {
+                  const term = buscadorVendedor.toLowerCase();
+                  return (v?.nombre || "").toLowerCase().includes(term) || (v?.email || "").toLowerCase().includes(term);
+                })
+                .map((v) => (
+                  <button
+                    key={v?.id}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      vendedorFiltro === v?.id ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                    }`}
+                    onClick={() => {
+                      if (!v) return;
+                      setVendedorFiltro(v.id);
+                      setShowVendorModal(false);
+                    }}
+                  >
+                    <p className="font-semibold">{v?.nombre}</p>
+                    <p className="text-xs text-gray-500">{v?.email}</p>
+                  </button>
+                ))}
+            </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowVendorModal(false)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden mb-6">
         <table className="w-full">
@@ -262,8 +388,8 @@ export default function ClientsPage() {
             {filtrados.map((c) => (
               <tr key={c.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
                 <td className="py-3 px-4 text-sm text-gray-700 flex items-center gap-2">
-                  <UserCircle2 size={16} className="text-[#1A6CD3]" /> {c.vendedor}
-                  <p className="text-[11px] text-gray-500">{c.vendedorEmail}</p>
+                  <UserCircle2 size={16} className="text-[#1A6CD3]" /> {vendorById[c.vendorId]?.nombre || "Sin asignar"}
+                  <p className="text-[11px] text-gray-500">{vendorById[c.vendorId]?.email}</p>
                 </td>
                 <td className="py-3 px-4">
                   <p className="font-semibold text-gray-800">{c.nombre}</p>
@@ -408,9 +534,9 @@ function Filter({
   opciones,
   label,
 }: {
-  value: string;
+  value: string | number;
   onChange: (v: any) => void;
-  opciones: string[];
+  opciones: Array<string | number>;
   label: string;
 }) {
   return (
@@ -422,7 +548,7 @@ function Filter({
         className="text-sm border border-[#D9E7F5] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
       >
         {opciones.map((op) => (
-          <option key={op} value={op}>{op}</option>
+          <option key={op} value={op.toString()}>{op}</option>
         ))}
       </select>
     </label>

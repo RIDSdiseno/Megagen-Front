@@ -20,6 +20,7 @@ type Cotizacion = {
   archivos: string[];
   historico: { fecha: string; nota: string }[];
   entregaProgramada?: string;
+  vendedorEmail?: string | null;
 };
 
 const etapasOrden: Etapa[] = ["Cotizacion confirmada", "Despacho", "Transito", "Entregado"];
@@ -50,6 +51,9 @@ export default function CotizacionesPage() {
   const [preview, setPreview] = useState<Cotizacion | null>(null);
   const [entregas, setEntregas] = useState<Record<number, string>>({});
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
+  const [responsableFiltro, setResponsableFiltro] = useState<string>("Todos");
+  const [showResponsableModal, setShowResponsableModal] = useState(false);
+  const [buscadorResponsable, setBuscadorResponsable] = useState("");
   const [summary, setSummary] = useState<{ etapa: Etapa; total: number }[]>([]);
   const [confirmCambio, setConfirmCambio] = useState<{ id: number; nueva: Etapa; actual: Etapa } | null>(null);
   const [nueva, setNueva] = useState<Cotizacion>({
@@ -68,18 +72,29 @@ export default function CotizacionesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [archivoDraft, setArchivoDraft] = useState<Record<number, string>>({});
+  const [nuevoArchivo, setNuevoArchivo] = useState<File | null>(null);
 
-  const headers = useMemo(() => {
+  const isBodeguero = useMemo(() => (user?.roles || []).includes("bodeguero"), [user?.roles]);
+  const isAdminLike = useMemo(
+    () => (user?.roles || []).some((r) => r === "admin" || r === "superadmin" || r === "supervisor"),
+    [user?.roles]
+  );
+
+  const authHeaders = useMemo(() => (user?.token ? { Authorization: `Bearer ${user.token}` } : {}), [user?.token]);
+
+  const jsonHeaders = useMemo(() => {
     const h: Record<string, string> = { "Content-Type": "application/json" };
-    if (user?.token) h["Authorization"] = `Bearer ${user.token}`;
-    return h;
-  }, [user?.token]);
+    return { ...h, ...authHeaders };
+  }, [authHeaders]);
 
   const fetchQuotes = async () => {
     setLoading(true);
     setError("");
     try {
-      const resp = await fetch(`${API_URL}/quotes`);
+      const params = new URLSearchParams();
+      if (isBodeguero && user?.email) params.append("vendedorEmail", user.email);
+      if (!isBodeguero && responsableFiltro !== "Todos") params.append("vendedorEmail", responsableFiltro);
+      const resp = await fetch(`${API_URL}/quotes?${params.toString()}`, { headers: jsonHeaders });
       if (!resp.ok) throw new Error("No se pudieron cargar las cotizaciones");
       const data = (await resp.json()) as Cotizacion[];
       setCotizaciones(data);
@@ -97,7 +112,7 @@ export default function CotizacionesPage() {
 
   const fetchSummary = async () => {
     try {
-      const resp = await fetch(`${API_URL}/quotes/summary`);
+      const resp = await fetch(`${API_URL}/quotes/summary`, { headers: jsonHeaders });
       if (!resp.ok) throw new Error("No se pudo cargar el resumen");
       const data = (await resp.json()) as { etapa: Etapa; total: number }[];
       setSummary(data);
@@ -111,11 +126,37 @@ export default function CotizacionesPage() {
     fetchSummary();
   }, []);
 
+  useEffect(() => {
+    fetchQuotes();
+    // resumen no cambia por filtro de responsable
+  }, [responsableFiltro, isBodeguero, user?.email]);
+
   const agregarArchivo = (cotId: number, nombre: string) => {
     if (!nombre) return;
     setCotizaciones((prev) =>
       prev.map((c) => (c.id === cotId ? { ...c, archivos: [...c.archivos, nombre] } : c))
     );
+  };
+
+  const subirArchivo = async (cotId: number, file: File) => {
+    setError("");
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const resp = await fetch(`${API_URL}/quotes/${cotId}/files`, {
+        method: "POST",
+        headers: authHeaders,
+        body: formData,
+      });
+      if (!resp.ok) throw new Error("No se pudo subir el archivo");
+      const updated = (await resp.json()) as Cotizacion;
+      setCotizaciones((prev) => prev.map((c) => (c.id === cotId ? updated : c)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo subir archivo");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCrearCotizacion = async () => {
@@ -124,14 +165,32 @@ export default function CotizacionesPage() {
     try {
       const resp = await fetch(`${API_URL}/quotes`, {
         method: "POST",
-        headers,
+        headers: jsonHeaders,
         body: JSON.stringify(nueva),
       });
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
         throw new Error(e.message || "No se pudo crear la cotizacion");
       }
-      const creada = (await resp.json()) as Cotizacion;
+      let creada = (await resp.json()) as Cotizacion;
+
+      if (nuevoArchivo) {
+        const formData = new FormData();
+        formData.append("file", nuevoArchivo);
+        try {
+          const uploadResp = await fetch(`${API_URL}/quotes/${creada.id}/files`, {
+            method: "POST",
+            headers: authHeaders,
+            body: formData,
+          });
+          if (uploadResp.ok) {
+            creada = (await uploadResp.json()) as Cotizacion;
+          }
+        } catch {
+          /* ignore errores de upload para no bloquear creacion */
+        }
+      }
+
       setCotizaciones((prev) => [creada, ...prev]);
       setSummary((prev) => {
         const map = new Map<Etapa, number>();
@@ -149,6 +208,7 @@ export default function CotizacionesPage() {
         comentarios: "",
         imagenUrl: "",
       });
+      setNuevoArchivo(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al crear cotizacion");
     }
@@ -162,23 +222,34 @@ export default function CotizacionesPage() {
     }));
   }, [cotizaciones, summary]);
 
+  const responsables = useMemo(() => {
+    const set = new Set<string>();
+    cotizaciones.forEach((c) => {
+      if (c.vendedorEmail) set.add(c.vendedorEmail);
+    });
+    return Array.from(set);
+  }, [cotizaciones]);
+
   const filtradas = useMemo(() => {
     const term = busqueda.toLowerCase();
-    return cotizaciones.filter(
-      (c) =>
+    const respFilter = responsableFiltro === "Todos" ? null : responsableFiltro;
+    return cotizaciones.filter((c) => {
+      const matchText =
         c.cliente.toLowerCase().includes(term) ||
         c.resumen.toLowerCase().includes(term) ||
         c.id.toString().includes(term) ||
-        c.codigo.toLowerCase().includes(term)
-    );
-  }, [busqueda, cotizaciones]);
+        c.codigo.toLowerCase().includes(term);
+      const matchResp = respFilter ? c.vendedorEmail === respFilter : true;
+      return matchText && matchResp;
+    });
+  }, [busqueda, cotizaciones, responsableFiltro]);
 
   const aplicarCambioEtapa = async (id: number, nuevaEtapa: Etapa) => {
     setError("");
     try {
       const resp = await fetch(`${API_URL}/quotes/${id}/stage`, {
         method: "PATCH",
-        headers,
+        headers: jsonHeaders,
         body: JSON.stringify({ etapa: nuevaEtapa }),
       });
       if (!resp.ok) {
@@ -221,7 +292,7 @@ export default function CotizacionesPage() {
   const handleScanDemo = async () => {
     setError("");
     try {
-      const resp = await fetch(`${API_URL}/quotes/scan`, { method: "POST", headers });
+      const resp = await fetch(`${API_URL}/quotes/scan`, { method: "POST", headers: jsonHeaders });
       if (!resp.ok) throw new Error("No se pudo escanear");
       const data = await resp.json();
       setNueva((prev) => ({
@@ -241,10 +312,10 @@ export default function CotizacionesPage() {
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Cotizaciones y archivos</p>
-          <h2 className="text-3xl font-extrabold text-[#1A334B]">Seguimiento de cotizaciones</h2>
+          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Cotizaciones / despacho</p>
+          <h2 className="text-3xl font-extrabold text-[#1A334B]">Seguimiento de entregas y cotizaciones</h2>
           <p className="text-gray-600 text-sm">
-            Rescata cotizaciones, revisa avances por etapa y registra entregas con respaldo de archivos.
+            Rescata, registra y valida entregas. Adjunta fotos o documentos y revisa avance por etapa.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -253,7 +324,7 @@ export default function CotizacionesPage() {
             className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
           >
             <FolderKanban size={18} />
-            Rescatar cotizaciones
+            Rescatar entregas
           </button>
           <button
             onClick={() => {
@@ -305,7 +376,18 @@ export default function CotizacionesPage() {
         ))}
         <span className="text-xs text-gray-500">* Rescate simulado por periodo para planificar descargas.</span>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          {(isAdminLike || (!isAdminLike && !isBodeguero && responsables.length > 0)) && (
+            <button
+              onClick={() => setShowResponsableModal(true)}
+              className="flex items-center gap-2 bg-white border border-[#D9E7F5] rounded-lg px-3 py-2 text-xs font-semibold text-[#1A334B] hover:bg-[#F4F8FD] shadow-sm"
+            >
+              Elegir responsable
+              <span className="px-2 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3] text-[11px]">
+                {responsableFiltro === "Todos" ? "Todos" : responsableFiltro}
+              </span>
+            </button>
+          )}
           <button
             onClick={() => setVista("tarjetas")}
             className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${
@@ -357,11 +439,14 @@ export default function CotizacionesPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs text-gray-500">Cotizacion #{cot.id}</p>
+                  <p className="text-xs text-gray-500">Entrega / Cotizacion #{cot.id}</p>
                   <h3 className="text-xl font-bold text-[#1A334B]">{cot.cliente}</h3>
                   <p className="text-sm text-gray-600">{cot.resumen}</p>
                 <p className="text-xs text-gray-500 mt-1">Fecha: {cot.fecha} | Total: {cot.total}</p>
                 <p className="text-xs text-gray-500">Direccion: {cot.direccion}</p>
+                {cot.vendedorEmail && (
+                  <p className="text-xs text-[#1A6CD3] font-semibold mt-1">Responsable: {cot.vendedorEmail}</p>
+                )}
               </div>
                 <span
                   className={`px-3 py-1 text-xs font-semibold rounded-full border ${etapaColors[cot.etapa]}`}
@@ -397,13 +482,28 @@ export default function CotizacionesPage() {
                 <p className="font-semibold text-[#1A334B] text-sm flex items-center gap-2">
                   <FolderKanban size={16} /> Archivos asociados
                 </p>
+                {cot.imagenUrl && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Foto de entrega</p>
+                    <img src={cot.imagenUrl} alt="Foto entrega" className="w-full max-h-56 object-cover rounded-lg border border-[#D9E7F5]" />
+                  </div>
+                )}
                 <ul className="mt-2 space-y-1 text-sm text-gray-700">
-                  {cot.archivos.map((file) => (
-                    <li key={file} className="flex items-center gap-2">
-                      <FileText size={14} className="text-[#1A6CD3]" />
-                      {file}
-                    </li>
-                  ))}
+                  {cot.archivos.map((file) => {
+                    const isLink = file.startsWith("http") || file.startsWith("/uploads");
+                    return (
+                      <li key={file} className="flex items-center gap-2">
+                        <FileText size={14} className="text-[#1A6CD3]" />
+                        {isLink ? (
+                          <a href={file} className="text-[#1A6CD3] hover:underline truncate" target="_blank" rel="noreferrer">
+                            {file}
+                          </a>
+                        ) : (
+                          <span className="truncate">{file}</span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
                 {(cot.etapa === "Cotizacion confirmada" || cot.etapa === "Despacho") ? (
                   <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -429,10 +529,12 @@ export default function CotizacionesPage() {
                       Subir archivo
                       <input
                         type="file"
+                        accept="image/*"
+                        capture="environment"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) agregarArchivo(cot.id, file.name);
+                          if (file) subirArchivo(cot.id, file);
                           e.target.value = "";
                         }}
                       />
@@ -495,6 +597,7 @@ export default function CotizacionesPage() {
               <tr>
                 <th className="py-3 px-4 text-sm">ID</th>
                 <th className="py-3 px-4 text-sm">Cliente</th>
+                <th className="py-3 px-4 text-sm">Responsable</th>
                 <th className="py-3 px-4 text-sm">Etapa</th>
                 <th className="py-3 px-4 text-sm">Fecha</th>
                 <th className="py-3 px-4 text-sm">Total</th>
@@ -512,13 +615,14 @@ export default function CotizacionesPage() {
                 const entregaGuardada = entregas[cot.id] || cot.entregaProgramada;
                 return (
                   <tr key={cot.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
-                    <td className="py-3 px-4 text-sm text-gray-700 font-semibold">#{cot.id}</td>
-                    <td className="py-3 px-4 text-sm text-gray-700">{cot.cliente}</td>
-                <td className="py-3 px-4 text-sm">
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${etapaColors[cot.etapa]}`}>
-                    {cot.etapa}
-                  </span>
-                </td>
+                  <td className="py-3 px-4 text-sm text-gray-700 font-semibold">#{cot.id}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{cot.cliente}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{cot.vendedorEmail || "No asignado"}</td>
+                  <td className="py-3 px-4 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${etapaColors[cot.etapa]}`}>
+                      {cot.etapa}
+                    </span>
+                  </td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.fecha}</td>
                     <td className="py-3 px-4 text-sm text-gray-700">{cot.total}</td>
                     <td className="py-3 px-4 text-sm text-gray-600">
@@ -541,6 +645,11 @@ export default function CotizacionesPage() {
             <div className="flex items-center gap-1">
               <FileText size={14} className="text-[#1A6CD3]" />
               <span>{cot.archivos.length}</span>
+            </div>
+            <div className="text-[11px] text-gray-600 mt-1 space-y-0.5">
+              {cot.archivos.slice(0, 3).map((f) => (
+                <p key={f} className="truncate">{f}</p>
+              ))}
             </div>
             {(cot.etapa === "Cotizacion confirmada" || cot.etapa === "Despacho") ? (
               <div className="mt-2 space-y-1">
@@ -567,10 +676,12 @@ export default function CotizacionesPage() {
                     Subir
                     <input
                       type="file"
+                      accept="image/*"
+                      capture="environment"
                       className="hidden"
                       onChange={(e) => {
                         const file = e.target.files?.[0];
-                        if (file) agregarArchivo(cot.id, file.name);
+                        if (file) subirArchivo(cot.id, file);
                         e.target.value = "";
                       }}
                     />
@@ -616,10 +727,62 @@ export default function CotizacionesPage() {
         </div>
       )}
 
+      {showResponsableModal && (
+        <Modal onClose={() => setShowResponsableModal(false)}>
+          <div className="p-5 space-y-3">
+            <h3 className="text-xl font-bold text-[#1A334B]">Elegir responsable</h3>
+            <input
+              type="text"
+              placeholder="Buscar por email..."
+              value={buscadorResponsable}
+              onChange={(e) => setBuscadorResponsable(e.target.value)}
+              className="w-full border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
+            />
+            <div className="max-h-64 overflow-auto divide-y divide-gray-100">
+              <button
+                className={`w-full text-left px-3 py-2 text-sm ${
+                  responsableFiltro === "Todos" ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                }`}
+                onClick={() => {
+                  setResponsableFiltro("Todos");
+                  setShowResponsableModal(false);
+                }}
+              >
+                Todos
+              </button>
+              {responsables
+                .filter((r) => r.toLowerCase().includes(buscadorResponsable.toLowerCase()))
+                .map((r) => (
+                  <button
+                    key={r}
+                    className={`w-full text-left px-3 py-2 text-sm ${
+                      responsableFiltro === r ? "bg-[#E6F0FB] text-[#1A6CD3]" : "hover:bg-[#F4F8FD] text-gray-700"
+                    }`}
+                    onClick={() => {
+                      setResponsableFiltro(r);
+                      setShowResponsableModal(false);
+                    }}
+                  >
+                    {r}
+                  </button>
+                ))}
+            </div>
+            <div className="flex justify-end">
+              <button
+                className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
+                onClick={() => setShowResponsableModal(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       {showRescate && (
         <Modal onClose={() => setShowRescate(false)}>
           <div className="p-5">
-            <h3 className="text-xl font-bold text-[#1A334B] mb-2">Rescatar cotizaciones</h3>
+            <h3 className="text-xl font-bold text-[#1A334B] mb-2">Rescatar cotizaciones / despacho</h3>
             <p className="text-sm text-gray-600 mb-3">
               Escoge el periodo y selecciona las cotizaciones a cargar para su seguimiento.
             </p>
@@ -658,12 +821,23 @@ export default function CotizacionesPage() {
               ))}
             </div>
 
-            <button
-              onClick={() => setShowRescate(false)}
-              className="w-full bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white py-2 rounded-lg font-semibold hover:shadow-lg transition"
-            >
-              Cerrar
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => {
+                  setShowRescate(false);
+                  setShowNuevo(true);
+                }}
+                className="flex-1 bg-white border border-[#1A6CD3] text-[#1A6CD3] py-2 rounded-lg font-semibold hover:bg-[#E6F0FB] transition"
+              >
+                Agregar manual
+              </button>
+              <button
+                onClick={() => setShowRescate(false)}
+                className="flex-1 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white py-2 rounded-lg font-semibold hover:shadow-lg transition"
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </Modal>
       )}
@@ -706,8 +880,29 @@ export default function CotizacionesPage() {
             <div className="text-sm text-gray-700">
               <p className="font-semibold text-[#1A334B] mb-1">Archivos</p>
               <ul className="list-disc pl-5 space-y-1">
-                {preview.archivos.map((file) => <li key={file}>{file}</li>)}
+                {preview.archivos.map((file) => {
+                  const isLink = file.startsWith("http") || file.startsWith("/uploads");
+                  return (
+                    <li key={file} className="truncate">
+                      {isLink ? (
+                        <a href={file} target="_blank" rel="noreferrer" className="text-[#1A6CD3] hover:underline">
+                          {file}
+                        </a>
+                      ) : (
+                        file
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
+              {preview.archivos.length > 0 && (preview.archivos[0].startsWith("http") || preview.archivos[0].startsWith("/uploads")) && (
+                <button
+                  onClick={() => window.open(preview.archivos[0], "_blank")}
+                  className="mt-2 px-3 py-2 text-xs font-semibold rounded-lg border border-[#1A6CD3] text-[#1A6CD3] hover:bg-[#E6F0FB] transition"
+                >
+                  Abrir primer archivo
+                </button>
+              )}
             </div>
             <div className="text-sm text-gray-700">
               <p className="font-semibold text-[#1A334B] mb-1">Historico</p>
@@ -770,6 +965,19 @@ export default function CotizacionesPage() {
                 onChange={(v) => setNueva({ ...nueva, imagenUrl: v })}
               />
             </div>
+            <label className="flex flex-col gap-1 text-xs text-[#1A334B]">
+              <span className="font-semibold">Adjuntar archivo / imagen</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => setNuevoArchivo(e.target.files?.[0] ?? null)}
+                className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700 bg-white"
+              />
+              {nuevoArchivo && (
+                <span className="text-[11px] text-gray-500">Seleccionado: {nuevoArchivo.name}</span>
+              )}
+            </label>
             <p className="text-xs text-gray-500">* En produccion, estas cotizaciones deberian llegar desde la API de rescate.</p>
             <div className="flex justify-end gap-2">
               <button

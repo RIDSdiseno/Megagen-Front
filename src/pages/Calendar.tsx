@@ -79,13 +79,18 @@ export default function CalendarPage() {
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState<LeadEvent["estado"] | "Todos">("Todos");
   const [registro, setRegistro] = useState<Array<{ id: LeadEvent["id"]; title: string; accion: LeadEvent["estado"]; fecha: Date }>>([]);
+  const [vendedorFiltro, setVendedorFiltro] = useState<string>("Todos");
 
   const isAdminLike = user?.roles?.some((r) => r === "admin" || r === "superadmin" || r === "supervisor") ?? false;
   const isVendedorSolo = (user?.roles?.includes("vendedor") ?? false) && !isAdminLike;
 
   const eventosPermitidos = useMemo(
-    () => eventos.filter((e) => !isVendedorSolo || !e.ownerEmail || e.ownerEmail === user?.email),
-    [eventos, isVendedorSolo, user?.email]
+    () => eventos.filter((e) => {
+      const byRole = !isVendedorSolo || !e.ownerEmail || e.ownerEmail === user?.email;
+      const byVendor = vendedorFiltro === "Todos" ? true : e.ownerEmail === vendedorFiltro;
+      return byRole && byVendor;
+    }),
+    [eventos, isVendedorSolo, user?.email, vendedorFiltro]
   );
 
   const eventosFiltrados = useMemo(() => {
@@ -113,6 +118,14 @@ export default function CalendarPage() {
     });
     return Object.entries(base);
   }, [eventosFiltrados]);
+
+  const vendedoresDisponibles = useMemo(() => {
+    const set = new Set<string>();
+    eventos.forEach((e) => {
+      if (e.ownerEmail) set.add(e.ownerEmail);
+    });
+    return Array.from(set);
+  }, [eventos]);
 
   const proximos = useMemo(
     () => [...eventosFiltrados].sort((a, b) => a.start.getTime() - b.start.getTime()),
@@ -154,7 +167,9 @@ export default function CalendarPage() {
     const fetchRemote = async () => {
       if (!user?.token) return;
       try {
-        const resp = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3000/api"}/meetings`, {
+        const params = new URLSearchParams();
+        if (isAdminLike && vendedorFiltro !== "Todos") params.append("vendedorEmail", vendedorFiltro);
+        const resp = await fetch(`${import.meta.env.VITE_API_URL ?? "http://localhost:3000/api"}/meetings?${params.toString()}`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         if (!resp.ok) return;
@@ -187,7 +202,7 @@ export default function CalendarPage() {
       }
     };
     fetchRemote();
-  }, [user?.token]);
+  }, [user?.token, isAdminLike, vendedorFiltro]);
 
   useEffect(() => {
     const check = () => {
@@ -238,6 +253,18 @@ export default function CalendarPage() {
               <option key={op} value={op}>{op}</option>
             ))}
           </select>
+          {isAdminLike && (
+            <select
+              value={vendedorFiltro}
+              onChange={(e) => setVendedorFiltro(e.target.value)}
+              className="text-sm border border-[#D9E7F5] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
+            >
+              <option value="Todos">Todos los vendedores</option>
+              {vendedoresDisponibles.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 

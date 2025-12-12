@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import MainLayout from "../components/MainLayout";
 import CountUp from "react-countup";
 import {
@@ -13,6 +13,7 @@ import {
   Building2,
   AlertTriangle,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 type KPIConfig = {
   title: string;
@@ -74,8 +75,91 @@ const resumenGeneral = [
   { titulo: "Reuniones programadas", valor: 19, detalle: "Proximas 72 horas", color: "from-indigo-500 to-indigo-700" },
 ];
 
+const vendedoresKpi = [
+  { nombre: "Luis Herrera", leads: 32, clientes: 14, conversion: 28, ventas: "$38.2M" },
+  { nombre: "Paula Rios", leads: 28, clientes: 12, conversion: 31, ventas: "$34.7M" },
+  { nombre: "Supervisor Norte", leads: 24, clientes: 10, conversion: 25, ventas: "$29.0M" },
+  { nombre: "Equipo Hibrido", leads: 18, clientes: 9, conversion: 30, ventas: "$26.4M" },
+];
+
+const bodeguerosKpi = [
+  { nombre: "Bodega Central", cotizacionesDia: 6, semana: 24, enTransito: 9, entregado: 12 },
+  { nombre: "Soporte", cotizacionesDia: 4, semana: 18, enTransito: 6, entregado: 9 },
+];
+
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
+
+type AdminVendor = {
+  id: number;
+  nombre: string;
+  email: string;
+  rol: string;
+  leads: { total: number; porEstado: Array<{ estado: string; total: number }> };
+  clientes: { total: number; porEstado: Array<{ estado: string; total: number }> };
+  cotizaciones: { total: number; porEtapa: Array<{ etapa: string; total: number }> };
+  recientes: {
+    leads: Array<{ id: number; nombre: string; estado: string; resumen?: string; telefono?: string; correo?: string; proximoPaso?: string }>;
+    cotizaciones: Array<{ id: number; codigo: string; etapa: string; cliente: string; entregaProgramada?: string; resumen?: string; total?: string }>;
+  };
+};
+
+type AdminDashboardResponse = {
+  resumen: { leads: number; clientes: number; cotizaciones: number };
+  leadsPorEstado: Array<{ estado: string; total: number }>;
+  clientesPorEstado: Array<{ estado: string; total: number }>;
+  cotizacionesPorEtapa: Array<{ etapa: string; total: number }>;
+  vendors: AdminVendor[];
+  ultimaActualizacion: string;
+};
+
+type BodegaDashboardResponse = {
+  cotizacionesPorEtapa: Array<{ etapa: string; total: number }>;
+  entregas: Array<{ id: number; codigo: string; cliente: string; etapa: string; entregaProgramada: string | null; comentarios: string | null; imagenUrl: string | null }>;
+  recientes: Array<{ id: number; codigo: string; cliente: string; etapa: string; resumen?: string; imagenUrl?: string | null; comentarios?: string | null; entregaProgramada?: string | null }>;
+  ultimaActualizacion: string;
+};
+
 export default function DashboardHome() {
   const [rango, setRango] = useState<"semana" | "30" | "historico">("30");
+  const { user } = useAuth();
+  const isAdmin = useMemo(() => (user?.roles || []).some((r) => r === "admin" || r === "superadmin"), [user?.roles]);
+  const isSupervisor = useMemo(() => (user?.roles || []).includes("supervisor"), [user?.roles]);
+  const isBodeguero = useMemo(() => (user?.roles || []).includes("bodeguero"), [user?.roles]);
+  const [adminData, setAdminData] = useState<AdminDashboardResponse | null>(null);
+  const [bodegaData, setBodegaData] = useState<BodegaDashboardResponse | null>(null);
+  const [loadingDash, setLoadingDash] = useState(false);
+  const [dashError, setDashError] = useState("");
+
+  useEffect(() => {
+    const fetchDashboards = async () => {
+      if (!user?.token) return;
+      setLoadingDash(true);
+      setDashError("");
+      try {
+        const headers = { Authorization: `Bearer ${user.token}` };
+
+        if (isAdmin || isSupervisor) {
+          const url = isAdmin ? `${API_URL}/dashboard/admin` : `${API_URL}/dashboard/supervisor`;
+          const resp = await fetch(url, { headers });
+          if (!resp.ok) throw new Error("No se pudo cargar dashboard comercial");
+          const data = (await resp.json()) as AdminDashboardResponse;
+          setAdminData(data);
+        }
+
+        if (isBodeguero || isAdmin) {
+          const respB = await fetch(`${API_URL}/dashboard/bodega`, { headers });
+          if (!respB.ok) throw new Error("No se pudo cargar dashboard bodega");
+          const dataB = (await respB.json()) as BodegaDashboardResponse;
+          setBodegaData(dataB);
+        }
+      } catch (err) {
+        setDashError(err instanceof Error ? err.message : "Error cargando dashboards");
+      } finally {
+        setLoadingDash(false);
+      }
+    };
+    fetchDashboards();
+  }, [user?.token, isAdmin, isSupervisor, isBodeguero]);
   return (
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
@@ -124,6 +208,200 @@ export default function DashboardHome() {
           </div>
         </div>
       </div>
+
+      {dashError && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-lg text-sm">
+          {dashError}
+        </div>
+      )}
+
+      {loadingDash && (
+        <div className="mb-4 bg-[#F4F8FD] border border-[#D9E7F5] text-[#1A334B] px-4 py-3 rounded-lg text-sm">
+          Cargando paneles con datos reales...
+        </div>
+      )}
+
+      {(isAdmin || isSupervisor) && adminData && (
+        <section className="mb-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-white border border-[#D9E7F5] rounded-xl p-4 shadow-sm">
+              <p className="text-xs text-gray-500">Leads</p>
+              <p className="text-2xl font-bold text-[#1A334B]">{adminData.resumen.leads}</p>
+              <p className="text-xs text-gray-500 mt-1">Distribucion por estado</p>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {adminData.leadsPorEstado.map((l) => (
+                  <span key={l.estado} className="px-3 py-1 rounded-full text-[11px] bg-[#E6F0FB] text-[#1A6CD3]">
+                    {l.estado}: {l.total}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-[#D9E7F5] rounded-xl p-4 shadow-sm">
+              <p className="text-xs text-gray-500">Clientes</p>
+              <p className="text-2xl font-bold text-[#1A334B]">{adminData.resumen.clientes}</p>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {adminData.clientesPorEstado.map((c) => (
+                  <span key={c.estado} className="px-3 py-1 rounded-full text-[11px] bg-emerald-50 text-emerald-700">
+                    {c.estado}: {c.total}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-[#D9E7F5] rounded-xl p-4 shadow-sm">
+              <p className="text-xs text-gray-500">Cotizaciones</p>
+              <p className="text-2xl font-bold text-[#1A334B]">{adminData.resumen.cotizaciones}</p>
+              <div className="flex gap-2 flex-wrap mt-2">
+                {adminData.cotizacionesPorEtapa.map((c) => (
+                  <span key={c.etapa} className="px-3 py-1 rounded-full text-[11px] bg-amber-50 text-amber-700">
+                    {c.etapa}: {c.total}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs text-gray-500 uppercase font-semibold">Vista admin / supervisor</p>
+                <p className="text-lg font-bold text-[#1A334B]">Vendedores, leads y clientes</p>
+                <p className="text-xs text-gray-500">Actualizado: {new Date(adminData.ultimaActualizacion).toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="overflow-auto">
+              <table className="w-full min-w-[900px]">
+                <thead className="text-left bg-[#F5FAFF] text-[#1A334B] text-sm">
+                  <tr>
+                    <th className="py-3 px-4">Vendedor / Rol</th>
+                    <th className="py-3 px-4">Leads</th>
+                    <th className="py-3 px-4">Clientes</th>
+                    <th className="py-3 px-4">Cotizaciones</th>
+                    <th className="py-3 px-4 w-[260px]">Recientes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adminData.vendors.map((v) => (
+                    <tr key={v.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-3 px-4">
+                        <p className="font-semibold text-gray-800">{v.nombre}</p>
+                        <p className="text-xs text-gray-500">{v.email}</p>
+                        <span className="text-[11px] px-2 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3]">{v.rol}</span>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <p className="font-semibold">{v.leads.total} totales</p>
+                        <div className="flex gap-1 flex-wrap mt-1">
+                          {v.leads.porEstado.map((e) => (
+                            <span key={e.estado} className="px-2 py-1 rounded-full text-[11px] bg-white border border-[#D9E7F5] text-[#1A334B]">
+                              {e.estado}: {e.total}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <p className="font-semibold">{v.clientes.total} clientes</p>
+                        <div className="flex gap-1 flex-wrap mt-1">
+                          {v.clientes.porEstado.map((c) => (
+                            <span key={c.estado} className="px-2 py-1 rounded-full text-[11px] bg-white border border-emerald-100 text-emerald-700">
+                              {c.estado}: {c.total}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-sm">
+                        <p className="font-semibold">{v.cotizaciones.total} cotizaciones</p>
+                        <div className="flex gap-1 flex-wrap mt-1">
+                          {v.cotizaciones.porEtapa.map((c) => (
+                            <span key={c.etapa} className="px-2 py-1 rounded-full text-[11px] bg-white border border-amber-100 text-amber-700">
+                              {c.etapa}: {c.total}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 text-xs text-gray-700">
+                        <div className="space-y-1">
+                          {v.recientes.leads.map((l) => (
+                            <div key={l.id} className="flex justify-between gap-2 border border-[#E6F0FB] rounded-lg px-2 py-1">
+                              <div>
+                                <p className="font-semibold text-gray-800">{l.nombre}</p>
+                                <p className="text-[11px] text-gray-500">{l.estado}</p>
+                              </div>
+                              <span className="text-[11px] text-[#1A6CD3]">Lead</span>
+                            </div>
+                          ))}
+                          {v.recientes.cotizaciones.map((c) => (
+                            <div key={c.id} className="flex justify-between gap-2 border border-amber-100 rounded-lg px-2 py-1">
+                              <div>
+                                <p className="font-semibold text-gray-800">#{c.codigo}</p>
+                                <p className="text-[11px] text-gray-500">{c.cliente}</p>
+                                <p className="text-[11px] text-amber-700">{c.etapa}</p>
+                              </div>
+                              <span className="text-[11px] text-amber-700">Cot</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(isBodeguero || isAdmin) && bodegaData && (
+        <section className="mb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-500 uppercase font-semibold">Panel bodeguero</p>
+              <p className="text-lg font-bold text-[#1A334B]">Seguimiento de cotizaciones y entregas</p>
+              <p className="text-xs text-gray-500">Actualizado: {new Date(bodegaData.ultimaActualizacion).toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {bodegaData.cotizacionesPorEtapa.map((c) => (
+              <div key={c.etapa} className="bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm">
+                <p className="text-xs text-gray-500">{c.etapa}</p>
+                <p className="text-2xl font-bold text-[#1A334B]">{c.total}</p>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+              <p className="text-sm font-bold text-[#1A334B] mb-2">Entregas programadas</p>
+              <div className="space-y-2 max-h-[320px] overflow-auto">
+                {bodegaData.entregas.length === 0 && <p className="text-xs text-gray-500">Sin entregas agendadas</p>}
+                {bodegaData.entregas.map((e) => (
+                  <div key={e.id} className="border border-amber-100 rounded-lg px-3 py-2 text-sm">
+                    <p className="font-semibold text-[#1A334B]">#{e.codigo} - {e.cliente}</p>
+                    <p className="text-xs text-amber-700">{e.etapa}</p>
+                    {e.entregaProgramada && (
+                      <p className="text-[11px] text-gray-600">Entrega: {new Date(e.entregaProgramada).toLocaleString()}</p>
+                    )}
+                    {e.comentarios && <p className="text-[11px] text-gray-600">{e.comentarios}</p>}
+                    {e.imagenUrl && <p className="text-[11px] text-[#1A6CD3]">Adjunto disponible</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+              <p className="text-sm font-bold text-[#1A334B] mb-2">Ultimas cotizaciones (bodega)</p>
+              <div className="space-y-2 max-h-[320px] overflow-auto">
+                {bodegaData.recientes.length === 0 && <p className="text-xs text-gray-500">Sin registros</p>}
+                {bodegaData.recientes.map((c) => (
+                  <div key={c.id} className="border border-[#E6F0FB] rounded-lg px-3 py-2 text-sm">
+                    <p className="font-semibold text-[#1A334B]">#{c.codigo} - {c.cliente}</p>
+                    <p className="text-[11px] text-gray-600">{c.etapa}</p>
+                    {c.entregaProgramada && <p className="text-[11px] text-gray-500">Entrega: {new Date(c.entregaProgramada).toLocaleString()}</p>}
+                    {c.resumen && <p className="text-[11px] text-gray-600">{c.resumen}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8">
         {kpis.map((kpi) => (
@@ -264,6 +542,77 @@ export default function DashboardHome() {
             <p className="text-sm text-white/90 mt-1">{item.detalle}</p>
           </div>
         ))}
+      </div>
+
+      {/* Comparativa por vendedor y operaciones de bodega */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        <section className="bg-white border border-[#D9E7F5] rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-xl font-bold text-[#1A334B]">Comparativa de vendedores</h3>
+              <p className="text-sm text-gray-500">Leads, clientes y conversion por responsable</p>
+            </div>
+            <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2 py-1 rounded-full">
+              Admin / Super admin / Supervisor
+            </span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {vendedoresKpi.map((v) => (
+              <div key={v.nombre} className="py-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-[#1A334B]">{v.nombre}</p>
+                  <p className="text-xs text-gray-500">Leads: {v.leads} · Clientes: {v.clientes}</p>
+                </div>
+                <div className="flex-1 max-w-[220px]">
+                  <div className="h-2 rounded-full bg-[#E6F0FB] overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F]"
+                      style={{ width: `${Math.min(v.conversion, 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-1">Conversion {v.conversion}% · Ventas {v.ventas}</p>
+                </div>
+                <button className="text-xs px-3 py-2 rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]">
+                  Ver cartera
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white border border-[#D9E7F5] rounded-2xl shadow-sm p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-xl font-bold text-[#1A334B]">Operaciones Bodega</h3>
+              <p className="text-sm text-gray-500">Cotizaciones, transito y entregas por bodeguero</p>
+            </div>
+            <span className="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-1 rounded-full">
+              Flujo despacho
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {bodeguerosKpi.map((b) => (
+              <div key={b.nombre} className="border border-[#E6F0FB] rounded-xl p-3 shadow-inner bg-gradient-to-br from-white to-[#F7FAFF]">
+                <p className="text-sm font-bold text-[#1A334B]">{b.nombre}</p>
+                <p className="text-xs text-gray-500 mb-2">Dia: {b.cotizacionesDia} · Semana: {b.semana}</p>
+                <div className="flex items-center justify-between text-xs text-gray-700">
+                  <span>En transito</span>
+                  <span className="font-semibold text-[#1A334B]">{b.enTransito}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[#E6F0FB] overflow-hidden mb-2">
+                  <div className="h-full bg-gradient-to-r from-amber-400 to-amber-600" style={{ width: `${Math.min(b.enTransito * 8, 100)}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-700">
+                  <span>Entregado</span>
+                  <span className="font-semibold text-[#1A334B]">{b.entregado}</span>
+                </div>
+                <div className="h-2 rounded-full bg-[#E6F0FB] overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600" style={{ width: `${Math.min(b.entregado * 8, 100)}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
 
       {/* Oportunidades */}

@@ -12,7 +12,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import { type Role } from "../context/AuthContext";
 
 const ALL_ROLES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
-const COMERCIALES: Role[] = ["admin", "superadmin", "supervisor", "vendedor"];
+const COMERCIALES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
 
 export default function AppRoutes() {
   return (
