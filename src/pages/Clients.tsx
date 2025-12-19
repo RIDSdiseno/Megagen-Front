@@ -239,12 +239,49 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <Metric label="Total" value={resumen.total} color="from-[#1A6CD3] to-[#0E4B8F]" />
-        <Metric label="Activos" value={resumen.activos} color="from-emerald-500 to-emerald-700" />
-        <Metric label="Onboarding" value={resumen.onboarding} color="from-amber-500 to-amber-700" />
-        <Metric label="En riesgo" value={resumen.riesgo} color="from-rose-500 to-rose-700" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        <Metric
+          label="Total"
+          value={resumen.total}
+          color="from-[#1A6CD3] to-[#0E4B8F]"
+          active={estadoFiltro === "Todos"}
+          onClick={() => setEstadoFiltro("Todos")}
+        />
+        <Metric
+          label="Activos"
+          value={resumen.activos}
+          color="from-emerald-500 to-emerald-700"
+          active={estadoFiltro === "Activo"}
+          onClick={() => setEstadoFiltro("Activo")}
+        />
+        <Metric
+          label="Onboarding"
+          value={resumen.onboarding}
+          color="from-amber-500 to-amber-700"
+          active={estadoFiltro === "Onboarding"}
+          onClick={() => setEstadoFiltro("Onboarding")}
+        />
+        <Metric
+          label="En riesgo"
+          value={resumen.riesgo}
+          color="from-rose-500 to-rose-700"
+          active={estadoFiltro === "En riesgo"}
+          onClick={() => setEstadoFiltro("En riesgo")}
+        />
       </div>
+
+      {estadoFiltro !== "Todos" && (
+        <div className="flex items-center gap-2 mb-5 text-sm">
+          <span className="text-[#1A334B] font-semibold">Filtro por estado:</span>
+          <span className="px-3 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3] text-xs font-semibold">{estadoFiltro}</span>
+          <button
+            onClick={() => setEstadoFiltro("Todos")}
+            className="text-xs font-semibold text-[#1A334B] border border-[#D9E7F5] rounded-lg px-3 py-1 hover:bg-[#F4F8FD]"
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
 
       <div className="bg-white p-4 border border-gray-200 rounded-xl flex flex-col lg:flex-row gap-3 items-start lg:items-center mb-6 shadow-sm">
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F4F8FD] border border-[#D9E7F5] text-gray-600 flex-1">
@@ -511,12 +548,33 @@ export default function ClientsPage() {
   );
 }
 
-function Metric({ label, value, color }: { label: string; value: number; color: string }) {
+function Metric({
+  label,
+  value,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
   return (
-    <div className={`p-4 rounded-xl text-white shadow-md bg-gradient-to-r ${color}`}>
-      <p className="text-xs uppercase tracking-wide text-white/80 font-semibold">{label}</p>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`p-4 rounded-xl text-white shadow-md bg-gradient-to-r ${color} transition transform ${
+        active ? "ring-2 ring-white/70 scale-[1.02]" : "hover:scale-[1.01]"
+      }`}
+    >
+      <p className="text-xs uppercase tracking-wide text-white/80 font-semibold flex items-center justify-between">
+        {label}
+        {active && <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20">Filtro</span>}
+      </p>
       <p className="text-2xl font-extrabold">{value}</p>
-    </div>
+    </button>
   );
 }
 

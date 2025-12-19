@@ -244,19 +244,42 @@ export default function Leads() {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {resumen.map(item => (
-            <div
-              key={item.estado}
-              className="bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5"
-            >
-              <p className="text-xs font-semibold text-gray-500">{item.estado}</p>
-              <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
-              <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
-                <span className="block h-full bg-[#1A6CD3] transition-all" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
-              </div>
-            </div>
-          ))}
+          {resumen.map(item => {
+            const active = estadoFiltro === item.estado;
+            return (
+              <button
+                type="button"
+                key={item.estado}
+                onClick={() => setEstadoFiltro(active ? "Todos" : item.estado)}
+                className={`text-left bg-white border border-[#D9E7F5] rounded-xl p-3 shadow-sm transition-all hover:-translate-y-0.5 ${
+                  active ? "ring-2 ring-[#1A6CD3]/50 border-[#1A6CD3]" : ""
+                }`}
+              >
+                <p className="text-xs font-semibold text-gray-500 flex items-center justify-between">
+                  {item.estado}
+                  {active && <span className="px-2 py-0.5 rounded-full bg-[#E6F0FB] text-[#1A6CD3] text-[10px]">Filtro</span>}
+                </p>
+                <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
+                <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
+                  <span className="block h-full bg-[#1A6CD3] transition-all" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
+                </div>
+              </button>
+            );
+          })}
         </div>
+
+        {estadoFiltro !== "Todos" && (
+          <div className="flex items-center gap-2 text-sm mt-2">
+            <span className="text-[#1A334B] font-semibold">Filtro por estado:</span>
+            <span className="px-3 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3] text-xs font-semibold">{estadoFiltro}</span>
+            <button
+              onClick={() => setEstadoFiltro("Todos")}
+              className="text-xs font-semibold text-[#1A334B] border border-[#D9E7F5] rounded-lg px-3 py-1 hover:bg-[#F4F8FD]"
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
 
       {isAdminLike && (
         <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm flex flex-col gap-3">
@@ -822,4 +845,3 @@ function EstadoBadge({ estado }: { estado: Lead["estado"] }) {
     </span>
   );
 }
-

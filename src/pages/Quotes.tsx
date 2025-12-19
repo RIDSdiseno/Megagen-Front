@@ -51,6 +51,7 @@ export default function CotizacionesPage() {
   const [preview, setPreview] = useState<Cotizacion | null>(null);
   const [entregas, setEntregas] = useState<Record<number, string>>({});
   const [cotizaciones, setCotizaciones] = useState<Cotizacion[]>([]);
+  const [etapaFiltro, setEtapaFiltro] = useState<Etapa | "Todos">("Todos");
   const [responsableFiltro, setResponsableFiltro] = useState<string>("Todos");
   const [showResponsableModal, setShowResponsableModal] = useState(false);
   const [buscadorResponsable, setBuscadorResponsable] = useState("");
@@ -238,6 +239,7 @@ export default function CotizacionesPage() {
   const filtradas = useMemo(() => {
     const term = busqueda.toLowerCase();
     const respFilter = responsableFiltro === "Todos" ? null : responsableFiltro;
+    const etapaFilter = etapaFiltro === "Todos" ? null : etapaFiltro;
     return cotizaciones.filter((c) => {
       const matchText =
         c.cliente.toLowerCase().includes(term) ||
@@ -245,9 +247,10 @@ export default function CotizacionesPage() {
         c.id.toString().includes(term) ||
         c.codigo.toLowerCase().includes(term);
       const matchResp = respFilter ? c.vendedorEmail === respFilter : true;
-      return matchText && matchResp;
+      const matchEtapa = etapaFilter ? c.etapa === etapaFilter : true;
+      return matchText && matchResp && matchEtapa;
     });
-  }, [busqueda, cotizaciones, responsableFiltro]);
+  }, [busqueda, cotizaciones, responsableFiltro, etapaFiltro]);
 
   const aplicarCambioEtapa = async (id: number, nuevaEtapa: Etapa) => {
     setError("");
@@ -349,20 +352,45 @@ export default function CotizacionesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        {resumenPorEtapa.map((item) => (
-          <div
-            key={item.etapa}
-            className={`bg-white border rounded-xl p-3 shadow-sm hover:shadow-md transition-all ${etapaColors[item.etapa]} bg-opacity-40`}
-          >
-            <p className="text-xs font-semibold text-gray-500">{item.etapa}</p>
-            <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
-            <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
-              <span className="block h-full bg-[#1A6CD3]" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+        {resumenPorEtapa.map((item) => {
+          const active = etapaFiltro === item.etapa;
+          return (
+            <button
+              type="button"
+              key={item.etapa}
+              onClick={() => setEtapaFiltro((prev) => (prev === item.etapa ? "Todos" : item.etapa))}
+              aria-pressed={active}
+              className={`text-left bg-white border rounded-xl p-3 shadow-sm transition-all ${etapaColors[item.etapa]} bg-opacity-40 ${
+                active ? "border-[#1A6CD3] ring-2 ring-[#1A6CD3]/40 shadow-md" : "hover:shadow-md"
+              }`}
+              title="Filtrar por estado"
+            >
+              <p className="text-xs font-semibold text-gray-500">{item.etapa}</p>
+              <p className="text-2xl font-bold text-[#1A334B]">{item.total}</p>
+              <div className="h-1.5 rounded-full bg-[#E6F0FB] mt-2 overflow-hidden">
+                <span className="block h-full bg-[#1A6CD3]" style={{ width: `${Math.min(item.total * 25, 100)}%` }} />
+              </div>
+              <p className="text-[11px] text-[#1A334B] mt-2 font-semibold">
+                {active ? "Filtro activo" : "Click para filtrar"}
+              </p>
+            </button>
+          );
+        })}
       </div>
+
+      {etapaFiltro !== "Todos" && (
+        <div className="flex items-center gap-2 mb-5 text-sm">
+          <span className="text-[#1A334B] font-semibold">Filtro por estado:</span>
+          <span className="px-3 py-1 rounded-full bg-[#E6F0FB] text-[#1A6CD3] text-xs font-semibold">{etapaFiltro}</span>
+          <button
+            onClick={() => setEtapaFiltro("Todos")}
+            className="text-xs font-semibold text-[#1A334B] border border-[#D9E7F5] rounded-lg px-3 py-1 hover:bg-[#F4F8FD]"
+          >
+            Limpiar
+          </button>
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 mb-5 flex items-center gap-3 flex-wrap">
         <span className="text-sm font-semibold text-[#1A334B]">Vista:</span>

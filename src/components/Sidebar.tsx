@@ -8,6 +8,8 @@ import {
   Settings,
   UserCog,
   Shield,
+  Truck,
+  Route,
 } from "lucide-react";
 import { useAuth, type Role } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
@@ -28,8 +30,10 @@ export default function Sidebar() {
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard, roles: ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"] },
     { to: "/leads", label: t("leads"), icon: Users, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
     { to: "/clientes", label: t("clients"), icon: UserCog, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
-    { to: "/calendar", label: t("calendar"), icon: Calendar, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
+    { to: "/calendar", label: `${t("calendar")}/Reuniones`, icon: Calendar, roles: ["admin", "superadmin", "supervisor", "vendedor"] },
     { to: "/cotizaciones", label: t("quotes"), icon: FileText, roles: ["admin", "superadmin", "supervisor", "bodeguero"] },
+    { to: "/historial-terreno", label: "Historial de cotizaciones", icon: Truck, roles: ["admin", "superadmin", "supervisor"] },
+    { to: "/visitas-terreno", label: "Visitas a terreno", icon: Route, roles: ["admin", "superadmin", "supervisor", "bodeguero"] },
     { to: "/usuarios", label: t("users"), icon: Shield, roles: ["admin", "superadmin"] },
     { to: "/configuracion", label: t("settings"), icon: Settings },
   ];

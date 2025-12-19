@@ -10,6 +10,8 @@ import UsuariosPage from "../pages/Users";
 import ConfiguracionPage from "../pages/Settings";
 import ProtectedRoute from "./ProtectedRoute";
 import { type Role } from "../context/AuthContext";
+import TerrainHistoryPage from "../pages/TerrainHistory";
+import TerrainVisitsPage from "../pages/TerrainVisits";
 
 const ALL_ROLES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
 const COMERCIALES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
@@ -66,6 +68,24 @@ export default function AppRoutes() {
             <CotizacionesPage />
           </ProtectedRoute>
         } 
+      />
+
+      <Route
+        path="/historial-terreno"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor"]}>
+            <TerrainHistoryPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/visitas-terreno"
+        element={
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "bodeguero"]}>
+            <TerrainVisitsPage />
+          </ProtectedRoute>
+        }
       />
 
       <Route 
