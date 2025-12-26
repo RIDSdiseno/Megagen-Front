@@ -1,7 +1,9 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
+
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 const logoLogin = "/LogoLogin.jpg";
 
@@ -13,6 +15,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { setSession } = useAuth();
+  const { t } = useI18n();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +30,7 @@ export default function LoginPage() {
       });
       if (!resp.ok) {
         const errJson = await resp.json().catch(() => ({}));
-        throw new Error(errJson.message || "Credenciales incorrectas");
+        throw new Error(errJson.message || t("Credenciales incorrectas"));
       }
       const data = (await resp.json()) as { token: string; user: { email: string; role?: string; roles?: string[] } };
       const roles = Array.isArray(data.user.roles)
@@ -47,7 +50,7 @@ export default function LoginPage() {
       }
       navigate("/dashboard");
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Credenciales incorrectas";
+      const message = err instanceof Error ? err.message : t("Credenciales incorrectas");
       setError(message);
     } finally {
       setLoading(false);
@@ -69,7 +72,7 @@ export default function LoginPage() {
         <div className="absolute top-1/3 left-1/2 w-36 h-36 bg-blue-200/20 rounded-full blur-2xl animate-[pulse_7s_ease_infinite]" />
         <div className="absolute -bottom-16 left-1/4 w-64 h-64 bg-indigo-300/20 rounded-full blur-3xl animate-[pulse_11s_ease_infinite]" />
         <div className="absolute top-10 right-1/3 w-56 h-56 bg-cyan-100/25 rounded-full blur-[90px] animate-pulse" />
-        {/* Líneas animadas */}
+        {/* Lineas animadas */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-1/4 left-[-20%] w-[140%] h-12 bg-gradient-to-r from-transparent via-white/10 to-transparent blur-xl animate-[slide_12s_linear_infinite]" />
           <div className="absolute top-1/2 left-[-30%] w-[150%] h-10 bg-gradient-to-r from-transparent via-cyan-300/15 to-transparent blur-xl animate-[slide_14s_linear_infinite_reverse]" />
@@ -83,7 +86,7 @@ export default function LoginPage() {
         border border-white/70 rounded-[28px] p-10 w-full max-w-xl 
         transition-all transform hover:scale-[1.01] hover:shadow-[0_25px_90px_rgba(0,0,0,0.4)]
       ">
-        {/* Líneas decorativas */}
+        {/* Lineas decorativas */}
         <div className="absolute -top-2 left-8 w-28 h-1.5 bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 blur-sm opacity-80 animate-pulse" />
         <div className="absolute -bottom-3 right-8 w-32 h-1.5 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-300 blur-sm opacity-80 animate-pulse" />
 
@@ -91,27 +94,26 @@ export default function LoginPage() {
         <div className="flex justify-center mb-8">
           <img
             src={logoLogin}
-            alt="Logo MegaGen"
+            alt={t("Logo MegaGen")}
             className="w-48 h-auto drop-shadow-xl animate-fadeIn"
           />
         </div>
 
-        {/* TÍTULO DEL SISTEMA */}
+        {/* TITULO DEL SISTEMA */}
         <div className="text-center mb-10">
           <h1 className="text-5xl font-extrabold text-megagen-dark tracking-tight drop-shadow-lg">
-            MegaGen CRM
+            {t("MegaGen CRM")}
           </h1>
           <p className="text-sm font-semibold text-megagen-primary uppercase tracking-[0.25em] mt-3">
-            Plataforma Comercial
+            {t("Plataforma Comercial")}
           </p>
         </div>
 
         {/* FORMULARIO */}
         <form className="space-y-6" onSubmit={handleSubmit}>
-          
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">
-              Correo electrónico
+              {t("Correo electronico")}
             </label>
             <input
               type="email"
@@ -131,7 +133,7 @@ export default function LoginPage() {
 
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">
-              Contraseña
+              {t("Contrasena")}
             </label>
             <div className="relative">
               <input
@@ -152,6 +154,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                aria-label={t("Mostrar contrasena")}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -171,7 +174,7 @@ export default function LoginPage() {
               onClick={() => navigate("/forgot")}
               className="text-sm font-semibold text-megagen-primary hover:text-megagen-dark"
             >
-              ¿Olvidaste tu contraseña?
+              {t("Olvidaste tu contrasena?")}
             </button>
           </div>
 
@@ -185,16 +188,14 @@ export default function LoginPage() {
               disabled:opacity-70 disabled:cursor-not-allowed
             "
           >
-            {loading ? "Validando..." : "Ingresar al CRM"}
+            {loading ? t("Validando...") : t("Ingresar al CRM")}
           </button>
-
         </form>
 
         {/* FOOTER */}
         <div className="text-center mt-10 text-[12px] text-gray-600">
-          © 2025 MegaGen — Plataforma Comercial
+          {t("(c) 2025 MegaGen - Plataforma Comercial")}
         </div>
-
       </div>
     </div>
   );

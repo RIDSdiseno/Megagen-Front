@@ -1,7 +1,9 @@
 import MainLayout from "../components/MainLayout";
 import { CalendarClock } from "lucide-react";
+import { useI18n } from "../context/I18nContext";
 
 export default function ReunionesPage() {
+  const { t } = useI18n();
   return (
     <MainLayout>
       <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
@@ -10,14 +12,14 @@ export default function ReunionesPage() {
             <CalendarClock className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-[#1A334B]">Reuniones de Leads</h2>
+            <h2 className="text-2xl font-bold text-[#1A334B]">{t("Reuniones de Leads")}</h2>
             <p className="text-gray-600 text-sm">
-              Agenda y seguimiento de reuniones con leads y clientes.
+              {t("Agenda y seguimiento de reuniones con leads y clientes.")}
             </p>
           </div>
         </div>
         <div className="border border-dashed border-gray-300 rounded-xl p-4 text-gray-700 bg-gray-50">
-          En construccion. Aqui puedes listar reuniones, estados y proximos pasos cuando definas el flujo.
+          {t("En construccion. Aqui puedes listar reuniones, estados y proximos pasos cuando definas el flujo.")}
         </div>
       </section>
     </MainLayout>

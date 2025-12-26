@@ -55,36 +55,36 @@ export default function ConfiguracionPage() {
 
   const handleSavePerfil = () => {
     if (!perfil.nombre || !perfil.correo) {
-      setError("Nombre y correo son obligatorios");
+      setError(t("Nombre y correo son obligatorios"));
       return;
     }
     const next = { perfil, notificaciones, preferencias };
     persist(next);
-    setMessage("Perfil actualizado");
+    setMessage(t("Perfil actualizado"));
     setError("");
   };
 
   const handleSaveSeguridad = () => {
     if (!seguridad.nueva || seguridad.nueva !== seguridad.confirmar) {
-      setError("La nueva contrasena no coincide");
+      setError(t("La nueva contrasena no coincide"));
       return;
     }
     setSeguridad({ actual: "", nueva: "", confirmar: "" });
-    setMessage("Contrasena actualizada (simulada)");
+    setMessage(t("Contrasena actualizada (simulada)"));
     setError("");
   };
 
   const handleSaveNotificaciones = () => {
     const next = { perfil, notificaciones, preferencias };
     persist(next);
-    setMessage("Notificaciones guardadas");
+    setMessage(t("Notificaciones guardadas"));
     setError("");
   };
 
   const handleSavePreferencias = () => {
     const next = { perfil, notificaciones, preferencias };
     persist(next);
-    setMessage("Preferencias guardadas");
+    setMessage(t("Preferencias guardadas"));
     setError("");
   };
 
@@ -92,18 +92,18 @@ export default function ConfiguracionPage() {
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("settings")}</p>
-          <h2 className="text-3xl font-extrabold text-[#1A334B]">Preferencias de usuario</h2>
+          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("Configuracion")}</p>
+          <h2 className="text-3xl font-extrabold text-[#1A334B]">{t("Preferencias de usuario")}</h2>
           <p className="text-gray-600 text-sm">
-            Gestiona perfil, seguridad y notificaciones desde un solo lugar.
+            {t("Gestiona perfil, seguridad y notificaciones desde un solo lugar.")}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
-        <InfoCard icon={<Settings className="w-5 h-5" />} title="Perfil" desc="Datos de cuenta y contacto" />
-        <InfoCard icon={<Shield className="w-5 h-5" />} title="Seguridad" desc="Contrasena y accesos" />
-        <InfoCard icon={<Bell className="w-5 h-5" />} title="Alertas" desc="Correos y recordatorios" />
+        <InfoCard icon={<Settings className="w-5 h-5" />} title={t("Perfil")} desc={t("Datos de cuenta y contacto")} />
+        <InfoCard icon={<Shield className="w-5 h-5" />} title={t("Seguridad")} desc={t("Contrasena y accesos")} />
+        <InfoCard icon={<Bell className="w-5 h-5" />} title={t("Alertas")} desc={t("Correos y recordatorios")} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -115,29 +115,29 @@ export default function ConfiguracionPage() {
               <Settings className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1A334B]">Perfil</h3>
-              <p className="text-gray-600 text-sm">Actualiza tu informacion personal y de empresa.</p>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Perfil")}</h3>
+              <p className="text-gray-600 text-sm">{t("Actualiza tu informacion personal y de empresa.")}</p>
             </div>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Nombre completo"
+              label={t("Nombre completo")}
               value={perfil.nombre}
               onChange={(v) => setPerfil((p) => ({ ...p, nombre: v }))}
             />
             <Input
-              label="Correo"
+              label={t("Correo")}
               value={perfil.correo}
               onChange={(v) => setPerfil((p) => ({ ...p, correo: v }))}
             />
             <Input
-              label="Telefono"
+              label={t("Telefono")}
               value={perfil.telefono}
               onChange={(v) => setPerfil((p) => ({ ...p, telefono: v }))}
             />
             <Input
-              label="Empresa"
+              label={t("Empresa")}
               value={perfil.empresa}
               onChange={(v) => setPerfil((p) => ({ ...p, empresa: v }))}
             />
@@ -148,7 +148,7 @@ export default function ConfiguracionPage() {
               onClick={handleSavePerfil}
               className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition"
             >
-              Guardar perfil
+              {t("Guardar perfil")}
             </button>
           </div>
         </section>
@@ -160,26 +160,26 @@ export default function ConfiguracionPage() {
               <Lock className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1A334B]">Seguridad</h3>
-              <p className="text-gray-600 text-sm">Cambia tu contrasena regularmente.</p>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Seguridad")}</h3>
+              <p className="text-gray-600 text-sm">{t("Cambia tu contrasena regularmente.")}</p>
             </div>
           </header>
 
           <div className="space-y-3">
             <Input
-              label="Contrasena actual"
+              label={t("Contrasena actual")}
               type="password"
               value={seguridad.actual}
               onChange={(v) => setSeguridad((s) => ({ ...s, actual: v }))}
             />
             <Input
-              label="Nueva contrasena"
+              label={t("Nueva contrasena")}
               type="password"
               value={seguridad.nueva}
               onChange={(v) => setSeguridad((s) => ({ ...s, nueva: v }))}
             />
             <Input
-              label="Confirmar contrasena"
+              label={t("Confirmar contrasena")}
               type="password"
               value={seguridad.confirmar}
               onChange={(v) => setSeguridad((s) => ({ ...s, confirmar: v }))}
@@ -191,7 +191,7 @@ export default function ConfiguracionPage() {
               onClick={handleSaveSeguridad}
               className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition"
             >
-              Guardar contrasena
+              {t("Guardar contrasena")}
             </button>
           </div>
         </section>
@@ -203,39 +203,39 @@ export default function ConfiguracionPage() {
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1A334B]">Notificaciones</h3>
-              <p className="text-gray-600 text-sm">Controla los avisos que recibes.</p>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Notificaciones")}</h3>
+              <p className="text-gray-600 text-sm">{t("Controla los avisos que recibes.")}</p>
             </div>
           </header>
 
           <div className="space-y-3">
             <Toggle
-              label="Emails de actividad (cotizaciones, leads, entregas)"
+              label={t("Emails de actividad (cotizaciones, leads, entregas)")}
               value={notificaciones.email}
               onChange={(v) => setNotificaciones((n) => ({ ...n, email: v }))}
             />
             <Toggle
-              label="Notificaciones push en escritorio"
+              label={t("Notificaciones push en escritorio")}
               value={notificaciones.push}
               onChange={(v) => setNotificaciones((n) => ({ ...n, push: v }))}
             />
             <Toggle
-              label="Recordatorios antes de reuniones"
+              label={t("Recordatorios antes de reuniones")}
               value={notificaciones.recordatorios}
               onChange={(v) => setNotificaciones((n) => ({ ...n, recordatorios: v }))}
             />
             <Select
-              label="Minutos antes del evento"
+              label={t("Minutos antes del evento")}
               value={String(notificaciones.minutosAntes)}
               opciones={[
-                { value: "20", label: "20 minutos" },
-                { value: "30", label: "30 minutos" },
-                { value: "60", label: "60 minutos" },
+                { value: "20", label: t("20 minutos") },
+                { value: "30", label: t("30 minutos") },
+                { value: "60", label: t("60 minutos") },
               ]}
               onChange={(v) => setNotificaciones((n) => ({ ...n, minutosAntes: Number(v) }))}
             />
             <Toggle
-              label="Cerrar recordatorios al marcar reunion como entregada"
+              label={t("Cerrar recordatorios al marcar reunion como entregada")}
               value={notificaciones.autoCerrar}
               onChange={(v) => setNotificaciones((n) => ({ ...n, autoCerrar: v }))}
             />
@@ -246,7 +246,7 @@ export default function ConfiguracionPage() {
               onClick={handleSaveNotificaciones}
               className="px-4 py-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold rounded-lg shadow hover:shadow-lg transition"
             >
-              Guardar notificaciones
+              {t("Guardar notificaciones")}
             </button>
           </div>
         </section>
@@ -258,19 +258,19 @@ export default function ConfiguracionPage() {
               <Globe2 className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-[#1A334B]">Preferencias</h3>
-              <p className="text-gray-600 text-sm">Idioma y zona horaria.</p>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Preferencias")}</h3>
+              <p className="text-gray-600 text-sm">{t("Idioma y zona horaria.")}</p>
             </div>
           </header>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
-              label="Idioma"
+              label={t("Idioma")}
               value={lang}
               opciones={[
-                { value: "es", label: "Espanol" },
-                { value: "en", label: "Ingles" },
-                { value: "ko", label: "Koreano" },
+                { value: "es", label: t("Espanol") },
+                { value: "en", label: t("Ingles") },
+                { value: "ko", label: t("Koreano") },
               ]}
               onChange={(v) => {
                 setLanguage(v as any);
@@ -279,7 +279,7 @@ export default function ConfiguracionPage() {
               }}
             />
             <Select
-              label="Zona horaria"
+              label={t("Zona horaria")}
               value={preferencias.zonaHoraria}
               opciones={[
                 { value: "America/Santiago", label: "America/Santiago" },
@@ -297,7 +297,7 @@ export default function ConfiguracionPage() {
               onClick={handleSavePreferencias}
               className="px-4 py-2 bg-[#1A334B] text-white font-semibold rounded-lg shadow hover:bg-[#0f2237] transition"
             >
-              Guardar preferencias
+              {t("Guardar preferencias")}
             </button>
           </div>
         </section>

@@ -8,6 +8,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { type Role, useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 type Estado = "Activo" | "Pendiente" | "Suspendido";
 
@@ -41,6 +42,7 @@ const usuariosData: Usuario[] = [
 
 export default function UsuariosPage() {
   const { hasRole, impersonate } = useAuth();
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [filtroRol, setFiltroRol] = useState<Role | "Todos">("Todos");
   const [filtroEstado, setFiltroEstado] = useState<Estado | "Todos">("Todos");
@@ -110,11 +112,11 @@ export default function UsuariosPage() {
     <MainLayout>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Administracion</p>
-          <h2 className="text-3xl font-extrabold text-[#1A334B]">Usuarios y permisos</h2>
-          <p className="text-gray-600 text-sm">Gestiona cuentas, roles y accesos rapidamente.</p>
+          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("Administracion")}</p>
+          <h2 className="text-3xl font-extrabold text-[#1A334B]">{t("Usuarios y permisos")}</h2>
+          <p className="text-gray-600 text-sm">{t("Gestiona cuentas, roles y accesos rapidamente.")}</p>
           <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 inline-block mt-1">
-            Admin / Super admin controlan todo. Supervisor audita. Vendedor solo Leads/Clientes/Calendario. Bodeguero solo Cotizaciones.
+            {t("Admin / Super admin controlan todo. Supervisor audita. Vendedor solo Leads/Clientes/Calendario. Bodeguero solo Cotizaciones.")}
           </p>
         </div>
         <button
@@ -122,15 +124,15 @@ export default function UsuariosPage() {
           className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
         >
           <UserPlus size={18} />
-          Invitar usuario
+          {t("Invitar usuario")}
         </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <ResumenCard label="Total" valor={resumen.total} color="from-[#1A6CD3] to-[#0E4B8F]" />
-        <ResumenCard label="Activos" valor={resumen.activos} color="from-emerald-500 to-emerald-700" />
-        <ResumenCard label="Pendientes" valor={resumen.pendientes} color="from-amber-500 to-amber-700" />
-        <ResumenCard label="Suspendidos" valor={resumen.suspendidos} color="from-rose-500 to-rose-700" />
+        <ResumenCard label={t("Total")} valor={resumen.total} color="from-[#1A6CD3] to-[#0E4B8F]" />
+        <ResumenCard label={t("Activos")} valor={resumen.activos} color="from-emerald-500 to-emerald-700" />
+        <ResumenCard label={t("Pendientes")} valor={resumen.pendientes} color="from-amber-500 to-amber-700" />
+        <ResumenCard label={t("Suspendidos")} valor={resumen.suspendidos} color="from-rose-500 to-rose-700" />
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 mb-5 flex flex-col lg:flex-row gap-3 items-start lg:items-center">
@@ -138,7 +140,7 @@ export default function UsuariosPage() {
           <Search size={16} className="text-[#1A6CD3]" />
           <input
             type="text"
-            placeholder="Buscar por nombre o correo..."
+            placeholder={t("Buscar por nombre o correo...")}
             className="flex-1 outline-none bg-transparent text-sm text-gray-700"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -146,8 +148,20 @@ export default function UsuariosPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Selector value={filtroRol} onChange={(v) => setFiltroRol(v as Role | "Todos")} label="Rol" opciones={["Todos", ...rolesCatalog]} />
-          <Selector value={filtroEstado} onChange={(v) => setFiltroEstado(v as Estado | "Todos")} label="Estado" opciones={["Todos", ...estados]} />
+          <Selector
+            value={filtroRol}
+            onChange={(v) => setFiltroRol(v as Role | "Todos")}
+            label={t("Rol")}
+            opciones={["Todos", ...rolesCatalog]}
+            t={t}
+          />
+          <Selector
+            value={filtroEstado}
+            onChange={(v) => setFiltroEstado(v as Estado | "Todos")}
+            label={t("Estado")}
+            opciones={["Todos", ...estados]}
+            t={t}
+          />
         </div>
       </div>
 
@@ -155,12 +169,12 @@ export default function UsuariosPage() {
         <table className="w-full">
           <thead className="bg-[#F5FAFF] text-[#1A334B] text-left">
             <tr>
-              <th className="py-3 px-4 text-sm">Usuario</th>
-              <th className="py-3 px-4 text-sm">Roles</th>
-              <th className="py-3 px-4 text-sm">Estado</th>
-              <th className="py-3 px-4 text-sm">Ultimo acceso</th>
-              <th className="py-3 px-4 text-sm text-center">Acciones</th>
-              <th className="py-3 px-4 text-sm text-center">Conectarse como</th>
+              <th className="py-3 px-4 text-sm">{t("Usuario")}</th>
+              <th className="py-3 px-4 text-sm">{t("Roles")}</th>
+              <th className="py-3 px-4 text-sm">{t("Estado")}</th>
+              <th className="py-3 px-4 text-sm">{t("Ultimo acceso")}</th>
+              <th className="py-3 px-4 text-sm text-center">{t("Acciones")}</th>
+              <th className="py-3 px-4 text-sm text-center">{t("Conectarse como")}</th>
             </tr>
           </thead>
           <tbody>
@@ -174,7 +188,7 @@ export default function UsuariosPage() {
                   <div className="flex flex-wrap gap-1 mb-2">
                     {u.roles.map((rol) => (
                       <span key={rol} className="px-2 py-1 rounded-full bg-[#E6F0FB] text-[#1A334B] text-[11px] font-semibold">
-                        {roleLabels[rol]}
+                        {t(roleLabels[rol])}
                       </span>
                     ))}
                   </div>
@@ -191,21 +205,21 @@ export default function UsuariosPage() {
                               : "bg-white text-[#1A334B] border-[#D9E7F5] hover:bg-[#F4F8FD]"
                           }`}
                         >
-                          {roleLabels[rol]}
+                          {t(roleLabels[rol])}
                         </button>
                       );
                     })}
                   </div>
                 </td>
                 <td className="py-3 px-4">
-                  <EstadoPill estado={u.estado} />
+                  <EstadoPill estado={u.estado} t={t} />
                 </td>
                 <td className="py-3 px-4 text-sm text-gray-700">{u.ultimoAcceso}</td>
                 <td className="py-3 px-4">
                   <div className="flex flex-wrap gap-2 justify-center">
                     {u.estado !== "Activo" && (
                       <BotonAccion
-                        label="Activar"
+                        label={t("Activar")}
                         color="text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
                         icon={<CheckCircle size={14} />}
                         onClick={() => cambiarEstado(u.id, "Activo")}
@@ -213,14 +227,14 @@ export default function UsuariosPage() {
                     )}
                     {u.estado === "Activo" && (
                       <BotonAccion
-                        label="Suspender"
+                        label={t("Suspender")}
                         color="text-rose-700 bg-rose-50 hover:bg-rose-100"
                         icon={<Ban size={14} />}
                         onClick={() => cambiarEstado(u.id, "Suspendido")}
                       />
                     )}
                     <BotonAccion
-                      label="Eliminar"
+                      label={t("Eliminar")}
                       color="text-[#1A334B] bg-[#F4F8FD] hover:bg-[#e7f0fa]"
                       icon={<ShieldCheck size={14} />}
                       onClick={() => eliminarUsuario(u.id)}
@@ -233,7 +247,7 @@ export default function UsuariosPage() {
                       onClick={() => impersonate({ email: u.correo, roles: u.roles })}
                       className="text-[11px] px-3 py-2 rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
                     >
-                      Conectarse
+                      {t("Conectarse")}
                     </button>
                   )}
                 </td>
@@ -247,14 +261,14 @@ export default function UsuariosPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[#1A334B]">Invitar / Crear usuario</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Invitar / Crear usuario")}</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">{t("Cerrar")}</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label="Nombre" value={nuevo.nombre} onChange={(v) => setNuevo({ ...nuevo, nombre: v })} />
-              <Input label="Correo" value={nuevo.correo} onChange={(v) => setNuevo({ ...nuevo, correo: v })} />
+              <Input label={t("Nombre")} value={nuevo.nombre} onChange={(v) => setNuevo({ ...nuevo, nombre: v })} />
+              <Input label={t("Correo")} value={nuevo.correo} onChange={(v) => setNuevo({ ...nuevo, correo: v })} />
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-[#1A334B]">Roles</span>
+                <span className="text-xs font-semibold text-[#1A334B]">{t("Roles")}</span>
                 <div className="flex flex-wrap gap-2">
                   {rolesCatalog.map((rol) => {
                     const active = nuevo.roles.includes(rol);
@@ -273,38 +287,38 @@ export default function UsuariosPage() {
                             : "bg-white text-[#1A334B] border-[#D9E7F5] hover:bg-[#F4F8FD]"
                         }`}
                       >
-                        {roleLabels[rol]}
+                        {t(roleLabels[rol])}
                       </button>
                     );
                   })}
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs font-semibold text-[#1A334B]">Estado</span>
+                <span className="text-xs font-semibold text-[#1A334B]">{t("Estado")}</span>
                 <select
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm text-gray-700"
                   value={nuevo.estado}
                   onChange={(e) => setNuevo({ ...nuevo, estado: e.target.value as Estado })}
                 >
                   {estados.map((estado) => (
-                    <option key={estado} value={estado}>{estado}</option>
+                    <option key={estado} value={estado}>{t(estado)}</option>
                   ))}
                 </select>
               </div>
-              <Input label="Ultimo acceso" value={nuevo.ultimoAcceso} onChange={(v) => setNuevo({ ...nuevo, ultimoAcceso: v })} />
+              <Input label={t("Ultimo acceso")} value={nuevo.ultimoAcceso} onChange={(v) => setNuevo({ ...nuevo, ultimoAcceso: v })} />
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
               >
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button
                 onClick={handleCrear}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
               >
-                Guardar usuario
+                {t("Guardar usuario")}
               </button>
             </div>
           </div>
@@ -350,11 +364,13 @@ function Selector({
   onChange,
   opciones,
   label,
+  t,
 }: {
   value: string;
   onChange: (v: string) => void;
   opciones: string[];
   label: string;
+  t: (key: string) => string;
 }) {
   return (
     <label className="flex items-center gap-2 text-xs font-semibold text-[#1A334B]">
@@ -365,14 +381,14 @@ function Selector({
         className="text-sm border border-[#D9E7F5] rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[#1A6CD3]"
       >
         {opciones.map((op) => (
-          <option key={op} value={op}>{op}</option>
+          <option key={op} value={op}>{t(op)}</option>
         ))}
       </select>
     </label>
   );
 }
 
-function EstadoPill({ estado }: { estado: Estado }) {
+function EstadoPill({ estado, t }: { estado: Estado; t: (key: string) => string }) {
   const styles: Record<Estado, string> = {
     Activo: "bg-emerald-50 text-emerald-700",
     Pendiente: "bg-amber-50 text-amber-700",
@@ -380,7 +396,7 @@ function EstadoPill({ estado }: { estado: Estado }) {
   };
   return (
     <span className={`px-3 py-1 rounded-full text-xs font-semibold ${styles[estado]}`}>
-      {estado}
+      {t(estado)}
     </span>
   );
 }

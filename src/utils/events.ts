@@ -5,6 +5,7 @@ export type StoredEvent = {
   end: string;   // ISO
   paciente?: string;
   telefono?: string;
+  correo?: string;
   estado?: string;
   resumen?: string;
   ownerEmail?: string;
@@ -34,6 +35,14 @@ export function addEvent(ev: Omit<StoredEvent, "id">) {
   localStorage.setItem(KEY, JSON.stringify([newEv, ...list]));
   window.dispatchEvent(new Event("storage"));
   return newEv;
+}
+
+export function updateEvent(id: string, patch: Partial<StoredEvent>) {
+  const list = read();
+  const next = list.map((ev) => (ev.id === id ? { ...ev, ...patch } : ev));
+  localStorage.setItem(KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event("storage"));
+  return next.find((ev) => ev.id === id);
 }
 
 export function clearEvents() {

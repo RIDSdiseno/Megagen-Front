@@ -1,7 +1,9 @@
 import MainLayout from "../components/MainLayout";
 import { FolderKanban } from "lucide-react";
+import { useI18n } from "../context/I18nContext";
 
 export default function ArchivosPage() {
+  const { t } = useI18n();
   return (
     <MainLayout>
       <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
@@ -10,14 +12,14 @@ export default function ArchivosPage() {
             <FolderKanban className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold text-[#1A334B]">Archivos</h2>
+            <h2 className="text-2xl font-bold text-[#1A334B]">{t("Archivos")}</h2>
             <p className="text-gray-600 text-sm">
-              Seccion base para centralizar documentos, imagenes y adjuntos.
+              {t("Seccion base para centralizar documentos, imagenes y adjuntos.")}
             </p>
           </div>
         </div>
         <div className="border border-dashed border-gray-300 rounded-xl p-4 text-gray-700 bg-gray-50">
-          En construccion. Define carpetas, filtros y acciones de subida cuando se habilite el modulo.
+          {t("En construccion. Define carpetas, filtros y acciones de subida cuando se habilite el modulo.")}
         </div>
       </section>
     </MainLayout>

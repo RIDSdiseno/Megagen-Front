@@ -27,13 +27,13 @@ export default function Topbar() {
 
       <div className="flex items-center gap-3">
         <h2 className="font-bold text-[#1A334B] text-lg tracking-tight">
-          {t("crmTitle")} - {t("platformSubtitle")}
+          {t("MegaGen CRM")} - {t("Plataforma Comercial")}
         </h2>
         <select
           value={lang}
           onChange={(e) => setLanguage(e.target.value as any)}
           className="text-xs border border-[#D9E7F5] rounded-lg px-2 py-1 text-[#1A334B] bg-white"
-          aria-label={t("language")}
+          aria-label={t("Idioma")}
         >
           <option value="es">ES</option>
           <option value="en">EN</option>
@@ -47,7 +47,7 @@ export default function Topbar() {
           <button
             onClick={() => setOpenNotif(!openNotif)}
             className="relative rounded-full p-2 hover:bg-gray-100 transition"
-            aria-label="Notificaciones"
+            aria-label={t("Notificaciones")}
           >
             <Bell size={18} className="text-[#1A334B]" />
             {notifications.length > 0 && (
@@ -60,7 +60,7 @@ export default function Topbar() {
           {openNotif && (
             <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 shadow-xl rounded-xl z-50 max-h-80 overflow-auto">
               <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-800">Notificaciones</p>
+                <p className="text-sm font-semibold text-gray-800">{t("Notificaciones")}</p>
                 <button
                   className="text-xs text-blue-600 hover:underline"
                   onClick={() => {
@@ -68,11 +68,11 @@ export default function Topbar() {
                     setNotifications([]);
                   }}
                 >
-                  Limpiar
+                  {t("Limpiar")}
                 </button>
               </div>
               {notifications.length === 0 ? (
-                <p className="text-xs text-gray-500 px-4 py-3">Sin notificaciones</p>
+                <p className="text-xs text-gray-500 px-4 py-3">{t("Sin notificaciones")}</p>
               ) : (
                 notifications.map((n) => (
                   <div key={n.id} className="px-4 py-3 border-b border-gray-100 last:border-b-0 flex flex-col gap-1">
@@ -88,7 +88,7 @@ export default function Topbar() {
                           setNotifications((prev) => prev.filter((x) => x.id !== n.id));
                         }}
                         className="mt-1"
-                        aria-label="Marcar como leida"
+                        aria-label={t("Marcar como leida")}
                       />
                     </div>
                     <p className="text-[11px] text-gray-400">{n.time}</p>
@@ -113,10 +113,12 @@ export default function Topbar() {
           {openMenu && (
             <div className="absolute right-0 mt-2 w-52 bg-white border border-gray-200 shadow-xl rounded-xl z-50">
               <div className="px-4 pt-3 pb-2 border-b border-gray-100">
-                <p className="text-sm text-gray-600">Conectado como</p>
+                <p className="text-sm text-gray-600">{t("Conectado como")}</p>
                 <p className="text-sm font-bold text-gray-800">{user?.email}</p>
                 {user?.impersonator && (
-                  <p className="text-[11px] text-amber-600">Impersonando (origen: {user.impersonator.email})</p>
+                  <p className="text-[11px] text-amber-600">
+                    {t("Impersonando (origen: {email})", { email: user.impersonator.email })}
+                  </p>
                 )}
               </div>
 
@@ -127,7 +129,7 @@ export default function Topbar() {
                   navigate("/configuracion#seguridad");
                 }}
               >
-                {t("changePassword")}
+                {t("Cambiar contrasena")}
               </button>
 
               <button
@@ -137,7 +139,7 @@ export default function Topbar() {
                   navigate("/configuracion");
                 }}
               >
-                {t("config")}
+                {t("Configuracion")}
               </button>
 
               {user?.impersonator && (
@@ -148,7 +150,7 @@ export default function Topbar() {
                     exitImpersonation();
                   }}
                 >
-                  Salir de impersonacion
+                  {t("Salir de impersonacion")}
                 </button>
               )}
 
@@ -156,7 +158,7 @@ export default function Topbar() {
                 className="w-full text-left px-4 py-3 hover:bg-gray-100 text-red-600 font-semibold transition"
                 onClick={logout}
               >
-              {t("logout")}
+              {t("Cerrar sesion")}
               </button>
             </div>
           )}

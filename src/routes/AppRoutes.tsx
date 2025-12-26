@@ -12,6 +12,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import { type Role } from "../context/AuthContext";
 import TerrainHistoryPage from "../pages/TerrainHistory";
 import TerrainVisitsPage from "../pages/TerrainVisits";
+import ClientsReportPage from "../pages/ClientsReport";
 
 const ALL_ROLES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
 const COMERCIALES: Role[] = ["admin", "superadmin", "supervisor", "vendedor", "bodeguero"];
@@ -48,6 +49,15 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "vendedor"]}>
             <ClientsPage />
+          </ProtectedRoute>
+        } 
+      />
+
+      <Route 
+        path="/clientes-listos" 
+        element={
+          <ProtectedRoute allowedRoles={["admin", "superadmin", "supervisor", "vendedor"]}>
+            <ClientsReportPage />
           </ProtectedRoute>
         } 
       />

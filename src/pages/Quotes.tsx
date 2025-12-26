@@ -1,7 +1,16 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState, type DragEvent } from "react";
 import MainLayout from "../components/MainLayout";
 import Modal from "../components/Modal";
-import { FileText, FolderKanban, ArrowRight, CheckCircle, Clock3, Loader2, RefreshCw } from "lucide-react";
+import {
+  FileText,
+  FolderKanban,
+  ArrowRight,
+  CheckCircle,
+  Clock3,
+  Loader2,
+  RefreshCw,
+  GripVertical,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 type Etapa = "Cotizacion confirmada" | "Despacho" | "Transito" | "Entregado";
@@ -24,6 +33,7 @@ type Cotizacion = {
 };
 
 const etapasOrden: Etapa[] = ["Cotizacion confirmada", "Despacho", "Transito", "Entregado"];
+const etapasCriticas = new Set<Etapa>(["Despacho", "Transito", "Entregado"]);
 const periodos: Array<"Semana" | "Dia" | "Mes"> = ["Semana", "Dia", "Mes"];
 const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000/api";
 
@@ -44,7 +54,7 @@ const tipoDocumentoPorEtapa: Record<Etapa, string> = {
 export default function CotizacionesPage() {
   const { user } = useAuth();
   const [periodo, setPeriodo] = useState<"Semana" | "Dia" | "Mes">("Semana");
-  const [vista, setVista] = useState<"tarjetas" | "tabla">("tarjetas");
+  const [vista, setVista] = useState<"proceso" | "tarjetas" | "tabla">("proceso");
   const [busqueda, setBusqueda] = useState("");
   const [showRescate, setShowRescate] = useState(false);
   const [showNuevo, setShowNuevo] = useState(false);
@@ -57,6 +67,8 @@ export default function CotizacionesPage() {
   const [buscadorResponsable, setBuscadorResponsable] = useState("");
   const [summary, setSummary] = useState<{ etapa: Etapa; total: number }[]>([]);
   const [confirmCambio, setConfirmCambio] = useState<{ id: number; nueva: Etapa; actual: Etapa } | null>(null);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [draggingEtapa, setDraggingEtapa] = useState<Etapa | null>(null);
   const [nueva, setNueva] = useState<Cotizacion>({
     id: 0,
     codigo: "NUEVA-001",
@@ -252,6 +264,15 @@ export default function CotizacionesPage() {
     });
   }, [busqueda, cotizaciones, responsableFiltro, etapaFiltro]);
 
+  const tablero = useMemo(() => {
+    const ordenar = (items: Cotizacion[]) =>
+      [...items].sort((a, b) => a.cliente.localeCompare(b.cliente));
+    return etapasOrden.reduce((acc, etapa) => {
+      acc[etapa] = ordenar(filtradas.filter((c) => c.etapa === etapa));
+      return acc;
+    }, {} as Record<Etapa, Cotizacion[]>);
+  }, [filtradas]);
+
   const aplicarCambioEtapa = async (id: number, nuevaEtapa: Etapa) => {
     setError("");
     try {
@@ -287,14 +308,64 @@ export default function CotizacionesPage() {
     if (nextIndex === actualIndex) return;
 
     const nuevaEtapa = etapasOrden[nextIndex];
-    const etapasCriticas = new Set<Etapa>(["Despacho", "Transito", "Entregado"]);
-
     if (etapasCriticas.has(cot.etapa) || etapasCriticas.has(nuevaEtapa)) {
       setConfirmCambio({ id, actual: cot.etapa, nueva: nuevaEtapa });
       return;
     }
 
     aplicarCambioEtapa(id, nuevaEtapa);
+  };
+
+  const solicitarCambioDirecto = (cot: Cotizacion, nuevaEtapa: Etapa) => {
+    if (cot.etapa === nuevaEtapa) return;
+    if (etapasCriticas.has(cot.etapa) || etapasCriticas.has(nuevaEtapa)) {
+      setConfirmCambio({ id: cot.id, actual: cot.etapa, nueva: nuevaEtapa });
+      return;
+    }
+    aplicarCambioEtapa(cot.id, nuevaEtapa);
+  };
+
+  const advertenciaEtapa = (etapa: Etapa) => {
+    if (etapa === "Despacho") return "Recuerda adjuntar guia de despacho y validar la direccion.";
+    if (etapa === "Transito") return "Recuerda registrar fecha de entrega y seguimiento.";
+    if (etapa === "Entregado") return "Al marcar Entregado se enviara al historial de cotizaciones.";
+    return "";
+  };
+
+  const puedeMoverEtapa = (from: Etapa, to: Etapa) => {
+    if (from === to) return false;
+    return true;
+  };
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>, cot: Cotizacion) => {
+    event.dataTransfer.setData("text/plain", String(cot.id));
+    event.dataTransfer.effectAllowed = "move";
+    setDraggingId(cot.id);
+    setDraggingEtapa(cot.etapa);
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDraggingEtapa(null);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>, target: Etapa) => {
+    if (draggingEtapa && puedeMoverEtapa(draggingEtapa, target)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    }
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>, target: Etapa) => {
+    event.preventDefault();
+    const rawId = event.dataTransfer.getData("text/plain");
+    const id = Number(rawId);
+    if (Number.isNaN(id)) return;
+    const actual = cotizaciones.find((c) => c.id === id);
+    if (!actual || actual.etapa === target) return;
+    solicitarCambioDirecto(actual, target);
+    setDraggingId(null);
+    setDraggingEtapa(null);
   };
 
   const handleScanDemo = async () => {
@@ -315,6 +386,14 @@ export default function CotizacionesPage() {
       setError(err instanceof Error ? err.message : "Error en escaneo");
     }
   };
+
+  const advertenciaCambio = confirmCambio ? advertenciaEtapa(confirmCambio.nueva) : "";
+  const esRetrocesoCambio = confirmCambio
+    ? etapasOrden.indexOf(confirmCambio.nueva) < etapasOrden.indexOf(confirmCambio.actual)
+    : false;
+  const advertenciaRetroceso = esRetrocesoCambio
+    ? "Retroceso: se registrara en el historico pero no se aplicara."
+    : "";
 
   return (
     <MainLayout>
@@ -422,6 +501,16 @@ export default function CotizacionesPage() {
             </button>
           )}
           <button
+            onClick={() => setVista("proceso")}
+            className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${
+              vista === "proceso"
+                ? "bg-[#1A6CD3] text-white border-[#1A6CD3] shadow-sm"
+                : "bg-white text-[#1A334B] border-[#D9E7F5] hover:bg-[#F4F8FD]"
+            }`}
+          >
+            Vista proceso
+          </button>
+          <button
             onClick={() => setVista("tarjetas")}
             className={`px-3 py-2 text-xs font-semibold rounded-full border transition-all ${
               vista === "tarjetas"
@@ -458,6 +547,172 @@ export default function CotizacionesPage() {
         <div className="flex items-center gap-2 text-[#1A334B] text-sm">
           <Loader2 className="animate-spin" size={18} /> Cargando cotizaciones...
         </div>
+      ) : vista === "proceso" ? (
+        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4 mb-4">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-[#1A334B]">Proceso de cotizaciones</h3>
+              <p className="text-xs text-gray-500">
+                Arrastra para cambiar la etapa. Los retrocesos se registran como intento.
+              </p>
+            </div>
+            <span className="text-xs text-gray-500">Total en vista: {filtradas.length}</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mt-4">
+            {etapasOrden.map((etapa) => {
+              const items = tablero[etapa];
+              const dragIndex = draggingEtapa ? etapasOrden.indexOf(draggingEtapa) : -1;
+              const targetIndex = etapasOrden.indexOf(etapa);
+              const isForward = dragIndex >= 0 && targetIndex > dragIndex;
+              const isBackward = dragIndex >= 0 && targetIndex < dragIndex;
+              const puedeSoltar = draggingEtapa ? puedeMoverEtapa(draggingEtapa, etapa) : false;
+              return (
+                <div
+                  key={etapa}
+                  onDragOver={(event) => handleDragOver(event, etapa)}
+                  onDrop={(event) => handleDrop(event, etapa)}
+                  className={`rounded-2xl border p-3 min-h-[260px] transition ${
+                    puedeSoltar
+                      ? isForward
+                        ? "border-[#1A6CD3] ring-2 ring-[#1A6CD3]/20 bg-[#F5FAFF]"
+                        : isBackward
+                        ? "border-amber-300 ring-2 ring-amber-200/40 bg-amber-50"
+                        : "border-[#E6EDF7] bg-[#F9FBFF]"
+                      : "border-[#E6EDF7] bg-[#F9FBFF]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`px-2 py-1 rounded-full text-[11px] font-semibold border ${etapaColors[etapa]}`}>
+                      {etapa}
+                    </span>
+                    <span className="text-[11px] text-gray-500">{items.length} cotizaciones</span>
+                  </div>
+
+                  {items.length === 0 ? (
+                    <div className="text-center text-xs text-gray-400 py-10">Sin cotizaciones en esta etapa.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {items.map((cot) => {
+                        const draggable = cot.etapa !== "Entregado";
+                        const puedeSubir = cot.etapa === "Cotizacion confirmada" || cot.etapa === "Despacho";
+                        const entregaGuardada = entregas[cot.id] || cot.entregaProgramada;
+                        return (
+                          <div
+                            key={cot.id}
+                            draggable={draggable}
+                            onDragStart={(event) => handleDragStart(event, cot)}
+                            onDragEnd={handleDragEnd}
+                            className={`bg-white border border-[#E6EDF7] rounded-xl p-3 shadow-sm transition-transform duration-150 ease-out transform-gpu ${
+                              draggable ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+                            } ${draggingId === cot.id ? "opacity-70 scale-[0.98] rotate-1" : "hover:-translate-y-0.5"}`}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-bold text-[#1A334B]">{cot.cliente}</p>
+                                <p className="text-[11px] text-gray-500">
+                                  #{cot.codigo} | {cot.total}
+                                </p>
+                                <p className="text-[11px] text-gray-500">{cot.fecha}</p>
+                              </div>
+                              {draggable && <GripVertical size={16} className="text-gray-400" />}
+                            </div>
+                            <p className="text-[11px] text-gray-600 mt-2">{cot.resumen}</p>
+                            {cot.vendedorEmail && (
+                              <p className="text-[11px] text-[#1A6CD3] font-semibold mt-2">
+                                Responsable: {cot.vendedorEmail}
+                              </p>
+                            )}
+                            <div className="mt-3 bg-[#F7FAFF] border border-[#D9E7F5] rounded-lg p-2">
+                              <p className="text-[11px] font-semibold text-[#1A334B] flex items-center gap-1">
+                                <FolderKanban size={12} /> Archivos asociados
+                              </p>
+                              {cot.archivos.length > 0 ? (
+                                <ul className="mt-1 space-y-1 text-[11px] text-gray-600">
+                                  {cot.archivos.slice(0, 3).map((file) => {
+                                    const isLink = file.startsWith("http") || file.startsWith("/uploads");
+                                    return (
+                                      <li key={file} className="truncate">
+                                        {isLink ? (
+                                          <a href={file} target="_blank" rel="noreferrer" className="text-[#1A6CD3] hover:underline">
+                                            {file}
+                                          </a>
+                                        ) : (
+                                          file
+                                        )}
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              ) : (
+                                <p className="mt-1 text-[10px] text-gray-500">Sin archivos adjuntos.</p>
+                              )}
+                              {puedeSubir ? (
+                                <div className="mt-2 space-y-1">
+                                  <input
+                                    type="text"
+                                    placeholder="Nombre de archivo"
+                                    className="w-full border border-[#D9E7F5] rounded-lg px-2 py-1 text-[11px] text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1A6CD3] bg-white"
+                                    value={archivoDraft[cot.id] ?? ""}
+                                    onChange={(e) => setArchivoDraft((prev) => ({ ...prev, [cot.id]: e.target.value }))}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const nombre = (archivoDraft[cot.id] ?? "").trim();
+                                        if (!nombre) return;
+                                        agregarArchivo(cot.id, nombre);
+                                        setArchivoDraft((prev) => ({ ...prev, [cot.id]: "" }));
+                                      }}
+                                      className="px-2 py-1 text-[10px] font-semibold rounded-lg bg-[#1A6CD3] text-white hover:bg-[#0E4B8F] transition"
+                                    >
+                                      + Agregar
+                                    </button>
+                                    <label className="px-2 py-1 text-[10px] font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD] cursor-pointer">
+                                      Subir
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        className="hidden"
+                                        onChange={(e) => {
+                                          const file = e.target.files?.[0];
+                                          if (file) subirArchivo(cot.id, file);
+                                          e.target.value = "";
+                                        }}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              ) : (
+                                <p className="mt-1 text-[10px] text-gray-500">
+                                  No se pueden agregar archivos en transito o entregado.
+                                </p>
+                              )}
+                            </div>
+                            {entregaGuardada && (
+                              <p className="mt-2 text-[10px] text-gray-600">
+                                <span className="font-semibold text-[#1A334B]">Entrega:</span> {entregaGuardada}
+                              </p>
+                            )}
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button
+                                onClick={() => setPreview(cot)}
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-[#1A6CD3] text-[#1A6CD3] hover:bg-[#E6F0FB] transition"
+                              >
+                                Vista previa
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
       ) : vista === "tarjetas" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filtradas.map((cot) => {
@@ -877,83 +1132,132 @@ export default function CotizacionesPage() {
 
       {preview && (
         <Modal onClose={() => setPreview(null)}>
-          <div className="p-5 space-y-3">
-            <h3 className="text-xl font-bold text-[#1A334B]">Vista previa #{preview.id}</h3>
-            <p className="text-sm text-gray-700"><strong>Cliente:</strong> {preview.cliente}</p>
-            <p className="text-sm text-gray-700"><strong>Total:</strong> {preview.total}</p>
-            <p className="text-sm text-gray-700"><strong>Resumen:</strong> {preview.resumen}</p>
-            <p className="text-sm text-gray-700"><strong>Direccion:</strong> {preview.direccion}</p>
-            <p className="text-sm text-gray-700"><strong>Comentarios:</strong> {preview.comentarios}</p>
-            <p className="text-sm text-gray-700">
-              <strong>Tipo de documento:</strong> {tipoDocumentoPorEtapa[preview.etapa] || "Cotizacion"}
-            </p>
-            <div className="text-sm text-gray-700">
-              <p className="font-semibold text-[#1A334B] mb-1">Etapas</p>
-              <div className="flex flex-wrap gap-2">
-                {etapasOrden.map((etapa) => (
-                  <span
-                    key={etapa}
-                    className={`px-3 py-1 rounded-full text-xs font-semibold border ${
-                      etapa === preview.etapa
-                        ? "bg-[#1A6CD3] text-white border-[#1A6CD3]"
-                        : "bg-white text-[#1A334B] border-[#D9E7F5]"
-                    }`}
-                  >
-                    {etapa}
-                  </span>
-                ))}
+          <div className="overflow-hidden rounded-2xl">
+            <div className="bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white px-5 py-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/80">Informe de cotizacion</p>
+                  <h3 className="text-2xl font-bold">{preview.cliente}</h3>
+                  <p className="text-xs text-white/90">
+                    #{preview.codigo} | {preview.fecha} | {preview.total}
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-semibold bg-white/90 text-[#1A334B]">
+                  {preview.etapa}
+                </span>
               </div>
             </div>
-            {preview.imagenUrl && (
-              <div className="text-sm text-gray-700">
-                <p className="font-semibold text-[#1A334B] mb-1">Documento (imagen)</p>
-                <img src={preview.imagenUrl} alt="Cotizacion" className="w-full rounded-lg border border-[#D9E7F5]" />
+
+            <div className="p-5 space-y-4 bg-white">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border border-[#E6EDF7] rounded-xl p-3 bg-[#F7FAFF]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#4B6B8A] font-semibold">Detalle</p>
+                  <p className="text-sm text-gray-700 mt-1">{preview.resumen}</p>
+                  <p className="text-xs text-gray-500 mt-2">Direccion: {preview.direccion}</p>
+                  <p className="text-xs text-gray-500">Comentarios: {preview.comentarios}</p>
+                  {preview.vendedorEmail && (
+                    <p className="text-xs text-[#1A6CD3] font-semibold mt-2">
+                      Responsable: {preview.vendedorEmail}
+                    </p>
+                  )}
+                </div>
+
+                <div className="border border-[#E6EDF7] rounded-xl p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#4B6B8A] font-semibold">Documento</p>
+                  <p className="text-sm text-gray-700 mt-1">
+                    {tipoDocumentoPorEtapa[preview.etapa] || "Cotizacion"}
+                  </p>
+                  {preview.entregaProgramada && (
+                    <p className="text-xs text-gray-500 mt-2">Entrega programada: {preview.entregaProgramada}</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {etapasOrden.map((etapa) => (
+                      <span
+                        key={etapa}
+                        className={`px-3 py-1 rounded-full text-[11px] font-semibold border ${
+                          etapa === preview.etapa
+                            ? "bg-[#1A6CD3] text-white border-[#1A6CD3]"
+                            : "bg-white text-[#1A334B] border-[#D9E7F5]"
+                        }`}
+                      >
+                        {etapa}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               </div>
-            )}
-            <div className="text-sm text-gray-700">
-              <p className="font-semibold text-[#1A334B] mb-1">Archivos</p>
-              <ul className="list-disc pl-5 space-y-1">
-                {preview.archivos.map((file) => {
-                  const isLink = file.startsWith("http") || file.startsWith("/uploads");
-                  return (
-                    <li key={file} className="truncate">
-                      {isLink ? (
-                        <a href={file} target="_blank" rel="noreferrer" className="text-[#1A6CD3] hover:underline">
-                          {file}
-                        </a>
-                      ) : (
-                        file
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              {preview.archivos.length > 0 && (preview.archivos[0].startsWith("http") || preview.archivos[0].startsWith("/uploads")) && (
-                <button
-                  onClick={() => window.open(preview.archivos[0], "_blank")}
-                  className="mt-2 px-3 py-2 text-xs font-semibold rounded-lg border border-[#1A6CD3] text-[#1A6CD3] hover:bg-[#E6F0FB] transition"
-                >
-                  Abrir primer archivo
-                </button>
+
+              {preview.imagenUrl && (
+                <div className="border border-[#E6EDF7] rounded-xl p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#4B6B8A] font-semibold">Documento (imagen)</p>
+                  <img
+                    src={preview.imagenUrl}
+                    alt="Cotizacion"
+                    className="w-full rounded-lg border border-[#D9E7F5] mt-2"
+                  />
+                </div>
               )}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border border-[#E6EDF7] rounded-xl p-3 bg-[#F7FAFF]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#4B6B8A] font-semibold">Archivos</p>
+                  {preview.archivos.length === 0 ? (
+                    <p className="text-xs text-gray-500 mt-2">Sin archivos adjuntos.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-sm text-gray-700">
+                      {preview.archivos.map((file) => {
+                        const isLink = file.startsWith("http") || file.startsWith("/uploads");
+                        return (
+                          <li key={file} className="truncate">
+                            {isLink ? (
+                              <a href={file} target="_blank" rel="noreferrer" className="text-[#1A6CD3] hover:underline">
+                                {file}
+                              </a>
+                            ) : (
+                              file
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {preview.archivos.length > 0 &&
+                    (preview.archivos[0].startsWith("http") || preview.archivos[0].startsWith("/uploads")) && (
+                      <button
+                        onClick={() => window.open(preview.archivos[0], "_blank")}
+                        className="mt-2 px-3 py-2 text-xs font-semibold rounded-lg border border-[#1A6CD3] text-[#1A6CD3] hover:bg-[#E6F0FB] transition"
+                      >
+                        Abrir primer archivo
+                      </button>
+                    )}
+                </div>
+
+                <div className="border border-[#E6EDF7] rounded-xl p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-[#4B6B8A] font-semibold">Historico</p>
+                  {preview.historico.length === 0 ? (
+                    <p className="text-xs text-gray-500 mt-2">Sin movimientos registrados.</p>
+                  ) : (
+                    <ul className="mt-2 space-y-1 text-xs text-gray-600">
+                      {preview.historico.map((h, idx) => (
+                        <li key={idx}>{h.fecha} - {h.nota}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setPreview(null)}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
-            <div className="text-sm text-gray-700">
-              <p className="font-semibold text-[#1A334B] mb-1">Historico</p>
-              <ul className="list-disc pl-5 space-y-1">
-                {preview.historico.map((h, idx) => (
-                  <li key={idx}>{h.fecha} - {h.nota}</li>
-                ))}
-              </ul>
-            </div>
-            <button
-              onClick={() => setPreview(null)}
-              className="w-full bg-megagen-primary hover:bg-megagen-dark text-white py-2 rounded-lg font-semibold transition"
-            >
-              Cerrar
-            </button>
           </div>
-      </Modal>
-    )}
+        </Modal>
+      )}
 
       {showNuevo && (
         <Modal onClose={() => setShowNuevo(false)}>
@@ -1035,8 +1339,18 @@ export default function CotizacionesPage() {
         <div className="p-5 space-y-3">
             <h3 className="text-xl font-bold text-[#1A334B]">Confirmar cambio</h3>
             <p className="text-sm text-gray-700">
-              La cotizacion esta en <strong>{confirmCambio.actual}</strong>. ¿Mover a <strong>{confirmCambio.nueva}</strong>?
+              La cotizacion esta en <strong>{confirmCambio.actual}</strong>. Mover a <strong>{confirmCambio.nueva}</strong>?
             </p>
+            {advertenciaRetroceso && (
+              <div className="text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg">
+                {advertenciaRetroceso}
+              </div>
+            )}
+            {advertenciaCambio && (
+              <div className="text-xs bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg">
+                {advertenciaCambio}
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -1084,3 +1398,4 @@ function Input({
     </label>
   );
 }
+

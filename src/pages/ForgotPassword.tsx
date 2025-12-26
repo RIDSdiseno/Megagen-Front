@@ -1,12 +1,15 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Mail, ArrowLeft } from "lucide-react";
+import { useI18n } from "../context/I18nContext";
+
 const logoLogin = "/LogoLogin.jpg";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const navigate = useNavigate();
+  const { t } = useI18n();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,21 +43,21 @@ export default function ForgotPasswordPage() {
           onClick={() => navigate("/login")}
           className="flex items-center gap-1 text-sm font-semibold text-[#1A334B] hover:text-[#0E4B8F] mb-4"
         >
-          <ArrowLeft size={16} /> Volver al login
+          <ArrowLeft size={16} /> {t("Volver al login")}
         </button>
 
         <div className="flex justify-center mb-6">
-          <img src={logoLogin} alt="Logo MegaGen" className="w-36 h-auto drop-shadow-xl" />
+          <img src={logoLogin} alt={t("Logo MegaGen")} className="w-36 h-auto drop-shadow-xl" />
         </div>
 
-        <h1 className="text-3xl font-extrabold text-[#1A334B] text-center mb-2">Recuperar acceso</h1>
+        <h1 className="text-3xl font-extrabold text-[#1A334B] text-center mb-2">{t("Recuperar acceso")}</h1>
         <p className="text-sm text-gray-600 text-center mb-6">
-          Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+          {t("Ingresa tu correo y te enviaremos un enlace para restablecer tu contrasena.")}
         </p>
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block text-sm font-semibold text-gray-700">
-            Correo electrónico
+            {t("Correo electronico")}
             <div className="flex items-center gap-2 px-3 py-2 border border-[#D9E7F5] rounded-lg bg-white shadow-sm mt-1">
               <Mail size={16} className="text-[#1A6CD3]" />
               <input
@@ -70,7 +73,7 @@ export default function ForgotPasswordPage() {
 
           {sent && (
             <div className="text-sm text-emerald-600 font-semibold">
-              Correo de recuperación enviado (simulado). Revisa tu bandeja.
+              {t("Correo de recuperacion enviado (simulado). Revisa tu bandeja.")}
             </div>
           )}
 
@@ -78,7 +81,7 @@ export default function ForgotPasswordPage() {
             type="submit"
             className="w-full py-3 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition"
           >
-            Enviar enlace
+            {t("Enviar enlace")}
           </button>
         </form>
       </div>

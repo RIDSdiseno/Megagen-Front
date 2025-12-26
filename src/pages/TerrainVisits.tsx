@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import MainLayout from "../components/MainLayout";
 import { useAuth } from "../context/AuthContext";
 import { CalendarRange, Filter, RefreshCw, Route, Upload, PlusCircle, Search, Users, Calendar as CalendarIcon, Download } from "lucide-react";
+import { useI18n } from "../context/I18nContext";
 import {
   Calendar as BigCalendar,
   dateFnsLocalizer,
   type Event as BigEvent,
 } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
-import { es } from "date-fns/locale";
+import { es, enUS, ko as koLocale } from "date-fns/locale";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 type VisitaEstado = "PROGRAMADA" | "EN_CURSO" | "COMPLETADA" | "CANCELADA";
@@ -46,7 +47,7 @@ const estadoColor: Record<VisitaEstado, string> = {
   CANCELADA: "bg-rose-100 text-rose-700 border-rose-200",
 };
 
-const locales = { es };
+const locales = { es, en: enUS, ko: koLocale };
 const localizer = dateFnsLocalizer({
   format,
   parse,
@@ -57,6 +58,7 @@ const localizer = dateFnsLocalizer({
 
 export default function TerrainVisitsPage() {
   const { user } = useAuth();
+  const { t, lang } = useI18n();
   const [visitas, setVisitas] = useState<VisitaTerreno[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -103,14 +105,14 @@ export default function TerrainVisitsPage() {
         const e = await resp.json().catch(() => ({}));
         const msg =
           status === 404
-            ? "Ruta /terrain/visits no encontrada en el backend. Revisa el deploy o la variable VITE_API_URL."
-            : e.message || "No se pudo cargar visitas a terreno";
+            ? t("Ruta /terrain/visits no encontrada en el backend. Revisa el deploy o la variable VITE_API_URL.")
+            : e.message || t("No se pudo cargar visitas a terreno");
         throw new Error(msg);
       }
       const data = (await resp.json()) as VisitaTerreno[];
       setVisitas(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error desconocido cargando visitas");
+      setError(err instanceof Error ? err.message : t("Error desconocido cargando visitas"));
     } finally {
       setLoading(false);
     }
@@ -178,11 +180,21 @@ export default function TerrainVisitsPage() {
 
   const exportCsv = () => {
     const rows = [
-      ["id", "fecha", "estado", "cliente", "direccion", "motivo", "resultado", "bodeguero", "cotizacion"],
+      [
+        "id",
+        t("Fecha"),
+        t("Estado"),
+        t("Cliente"),
+        t("Direccion"),
+        t("Motivo"),
+        t("Resultado"),
+        t("Bodeguero"),
+        t("Cotizacion"),
+      ],
       ...filtradas.map((v) => [
         v.id,
         new Date(v.fecha).toISOString(),
-        v.estado,
+        t(estadoLabel[v.estado]),
         v.cliente,
         v.direccion,
         v.motivo,
@@ -209,7 +221,7 @@ export default function TerrainVisitsPage() {
         (v) => `
           <tr>
             <td style="padding:6px 8px;border:1px solid #e5e7eb;">${new Date(v.fecha).toLocaleString()}</td>
-            <td style="padding:6px 8px;border:1px solid #e5e7eb;">${estadoLabel[v.estado]}</td>
+            <td style="padding:6px 8px;border:1px solid #e5e7eb;">${t(estadoLabel[v.estado])}</td>
             <td style="padding:6px 8px;border:1px solid #e5e7eb;">${v.cliente}</td>
             <td style="padding:6px 8px;border:1px solid #e5e7eb;">${v.bodegueroEmail || ""}</td>
             <td style="padding:6px 8px;border:1px solid #e5e7eb;">${v.direccion || ""}</td>
@@ -221,7 +233,7 @@ export default function TerrainVisitsPage() {
     win.document.write(`
       <html>
         <head>
-          <title>Informe de Visitas a Terreno</title>
+          <title>${t("Informe de Visitas a Terreno")}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; color: #1f2937; }
             h1 { margin-bottom: 4px; }
@@ -231,13 +243,13 @@ export default function TerrainVisitsPage() {
           </style>
         </head>
         <body>
-          <h1>Visitas a Terreno</h1>
-          <h3>Generado ${new Date().toLocaleString()}</h3>
-          <p>Total registros: ${filtradas.length}</p>
+          <h1>${t("Visitas a Terreno")}</h1>
+          <h3>${t("Generado")} ${new Date().toLocaleString()}</h3>
+          <p>${t("Total registros")}: ${filtradas.length}</p>
           <table>
             <thead>
               <tr>
-                <th>Fecha</th><th>Estado</th><th>Cliente</th><th>Bodeguero</th><th>Dirección</th><th>Motivo</th>
+                <th>${t("Fecha")}</th><th>${t("Estado")}</th><th>${t("Cliente")}</th><th>${t("Bodeguero")}</th><th>${t("Direccion")}</th><th>${t("Motivo")}</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -257,13 +269,13 @@ export default function TerrainVisitsPage() {
         const end = new Date(start.getTime() + 60 * 60 * 1000);
         return {
           id: v.id,
-          title: `${estadoLabel[v.estado]} - ${v.cliente}`,
+          title: `${t(estadoLabel[v.estado])} - ${v.cliente}`,
           start,
           end,
           resource: v,
         };
       }),
-    [filtradas]
+    [filtradas, t]
   );
 
   const eventStyleGetter = (event: VisitaEvent) => {
@@ -300,7 +312,7 @@ export default function TerrainVisitsPage() {
       });
       if (!resp.ok) {
         const e = await resp.json().catch(() => ({}));
-        throw new Error(e.message || "No se pudo crear la visita");
+        throw new Error(e.message || t("No se pudo crear la visita"));
       }
       await fetchVisitas();
       setShowForm(false);
@@ -316,7 +328,7 @@ export default function TerrainVisitsPage() {
         cotizacionId: "",
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error creando visita");
+      setError(err instanceof Error ? err.message : t("Error creando visita"));
     }
   };
 
@@ -324,10 +336,10 @@ export default function TerrainVisitsPage() {
     <MainLayout>
       <div className="flex flex-col gap-3 mb-6 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">Operaciones</p>
-          <h2 className="text-3xl font-extrabold text-[#1A334B]">Visitas a terreno</h2>
+          <p className="text-sm uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("Operaciones")}</p>
+          <h2 className="text-3xl font-extrabold text-[#1A334B]">{t("Visitas a terreno")}</h2>
           <p className="text-gray-600 text-sm">
-            Controla las salidas a terreno del equipo de bodega: fechas, responsable y estado de cada visita.
+            {t("Controla las salidas a terreno del equipo de bodega: fechas, responsable y estado de cada visita.")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -335,32 +347,32 @@ export default function TerrainVisitsPage() {
             onClick={fetchVisitas}
             className="flex items-center gap-2 border border-[#D9E7F5] text-[#1A334B] font-semibold px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all bg-white"
           >
-            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> Actualizar
+            <RefreshCw size={16} className={loading ? "animate-spin" : ""} /> {t("Actualizar")}
           </button>
           <button
             onClick={() => setShowCalendar(true)}
             className="flex items-center gap-2 border border-[#D9E7F5] text-[#1A334B] font-semibold px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all bg-white"
           >
-            <CalendarIcon size={16} /> Calendario
+            <CalendarIcon size={16} /> {t("Calendario")}
           </button>
           <button
             onClick={exportCsv}
             className="flex items-center gap-2 border border-[#D9E7F5] text-[#1A334B] font-semibold px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all bg-white"
           >
-            <Upload size={16} /> Exportar CSV
+            <Upload size={16} /> {t("Exportar CSV")}
           </button>
           <button
             onClick={exportPdf}
             className="flex items-center gap-2 border border-[#D9E7F5] text-[#1A334B] font-semibold px-4 py-2 rounded-lg shadow-sm hover:shadow-md transition-all bg-white"
           >
-            <Download size={16} /> Exportar PDF
+            <Download size={16} /> {t("Exportar PDF")}
           </button>
           {puedeCrear && (
             <button
               onClick={() => setShowForm(true)}
               className="flex items-center gap-2 bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white font-semibold px-4 py-2 rounded-lg shadow-md hover:shadow-lg transition-all"
             >
-              <PlusCircle size={16} /> Nueva visita
+              <PlusCircle size={16} /> {t("Nueva visita")}
             </button>
           )}
         </div>
@@ -378,8 +390,8 @@ export default function TerrainVisitsPage() {
             } ${estadoColor[estado]}`}
           >
             <p className="text-xs font-semibold text-gray-600 flex items-center justify-between">
-              {estadoLabel[estado]}
-              {estadoFiltro === estado && <span className="text-[10px] px-2 py-0.5 bg-white/60 rounded-full">Filtro</span>}
+              {t(estadoLabel[estado])}
+              {estadoFiltro === estado && <span className="text-[10px] px-2 py-0.5 bg-white/60 rounded-full">{t("Filtro")}</span>}
             </p>
             <p className="text-2xl font-bold text-[#1A334B]">{resumenEstado[estado]}</p>
           </button>
@@ -394,7 +406,7 @@ export default function TerrainVisitsPage() {
               type="text"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por cliente, motivo o direccion"
+              placeholder={t("Buscar por cliente, motivo o direccion")}
               className="bg-transparent text-sm outline-none"
             />
           </div>
@@ -405,7 +417,7 @@ export default function TerrainVisitsPage() {
               onChange={(e) => setClienteFiltro(e.target.value)}
               className="bg-transparent text-sm outline-none"
             >
-              <option value="Todos">Todos los clientes</option>
+              <option value="Todos">{t("Todos los clientes")}</option>
               {clientes.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
@@ -418,7 +430,7 @@ export default function TerrainVisitsPage() {
               onChange={(e) => setBodegueroFiltro(e.target.value)}
               className="bg-transparent text-sm outline-none"
             >
-              <option value="Todos">Todos los bodegueros</option>
+              <option value="Todos">{t("Todos los bodegueros")}</option>
               {bodegueros.map((b) => (
                 <option key={b} value={b}>{b}</option>
               ))}
@@ -427,7 +439,7 @@ export default function TerrainVisitsPage() {
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#F4F8FD] border border-[#D9E7F5] text-gray-700">
             <CalendarRange size={16} className="text-[#1A6CD3]" />
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="bg-transparent text-sm outline-none" />
-            <span className="text-xs text-gray-500">a</span>
+            <span className="text-xs text-gray-500">{t("a")}</span>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="bg-transparent text-sm outline-none" />
           </div>
           {filtrosActivos && (
@@ -442,7 +454,7 @@ export default function TerrainVisitsPage() {
             }}
             className="text-xs font-semibold text-[#1A334B] border border-[#D9E7F5] rounded-lg px-3 py-2 bg-white hover:bg-[#F4F8FD]"
           >
-            Limpiar filtros
+            {t("Limpiar filtros")}
           </button>
           )}
         </div>
@@ -450,20 +462,20 @@ export default function TerrainVisitsPage() {
 
       {loading ? (
         <div className="flex items-center gap-2 text-[#1A334B] text-sm">
-          <Route size={16} className="animate-pulse" /> Cargando visitas...
+          <Route size={16} className="animate-pulse" /> {t("Cargando visitas...")}
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           <table className="w-full">
             <thead className="bg-[#F5FAFF] text-[#1A334B] text-left text-sm">
               <tr>
-                <th className="py-3 px-4">Fecha</th>
-                <th className="py-3 px-4">Estado</th>
-                <th className="py-3 px-4">Cliente</th>
-                <th className="py-3 px-4">Bodeguero</th>
-                <th className="py-3 px-4">Direccion</th>
-                <th className="py-3 px-4">Motivo / Resultado</th>
-                <th className="py-3 px-4">Cotizacion</th>
+                <th className="py-3 px-4">{t("Fecha")}</th>
+                <th className="py-3 px-4">{t("Estado")}</th>
+                <th className="py-3 px-4">{t("Cliente")}</th>
+                <th className="py-3 px-4">{t("Bodeguero")}</th>
+                <th className="py-3 px-4">{t("Direccion")}</th>
+                <th className="py-3 px-4">{t("Motivo / Resultado")}</th>
+                <th className="py-3 px-4">{t("Cotizacion")}</th>
               </tr>
           </thead>
           <tbody>
@@ -476,26 +488,26 @@ export default function TerrainVisitsPage() {
                   <td className="py-3 px-4 text-sm text-gray-700">{new Date(v.fecha).toLocaleString()}</td>
                   <td className="py-3 px-4 text-sm">
                     <span className={`px-2 py-1 rounded-full text-xs font-semibold border ${estadoColor[v.estado]}`}>
-                      {estadoLabel[v.estado]}
+                      {t(estadoLabel[v.estado])}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-800">
                     <p className="font-semibold">{v.cliente}</p>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-700">
-                    <p className="font-semibold">{v.bodegueroNombre || "Sin nombre"}</p>
+                    <p className="font-semibold">{v.bodegueroNombre || t("Sin nombre")}</p>
                     <p className="text-xs text-gray-500">{v.bodegueroEmail}</p>
                   </td>
-                  <td className="py-3 px-4 text-sm text-gray-700">{v.direccion || "No informada"}</td>
+                  <td className="py-3 px-4 text-sm text-gray-700">{v.direccion || t("No informada")}</td>
                   <td className="py-3 px-4 text-sm text-gray-700">
-                    <p className="font-semibold">{v.motivo || "Sin motivo"}</p>
+                    <p className="font-semibold">{v.motivo || t("Sin motivo")}</p>
                     <p className="text-xs text-gray-500">{v.resultado || v.comentarios || ""}</p>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-700">
                     {v.cotizacionId ? (
                       <span className="font-semibold text-[#1A6CD3]">#{v.cotizacionId} {v.cotizacionCodigo}</span>
                     ) : (
-                      <span className="text-gray-500 text-xs">Sin referencia</span>
+                      <span className="text-gray-500 text-xs">{t("Sin referencia")}</span>
                     )}
                   </td>
                 </tr>
@@ -503,7 +515,7 @@ export default function TerrainVisitsPage() {
               {filtradas.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-6 text-center text-sm text-gray-500">
-                    No hay visitas para los filtros aplicados.
+                    {t("No hay visitas para los filtros aplicados.")}
                   </td>
                 </tr>
               )}
@@ -516,26 +528,26 @@ export default function TerrainVisitsPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[#1A334B]">Detalle de visita</h3>
-              <button onClick={() => setDetalle(null)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Detalle de visita")}</h3>
+              <button onClick={() => setDetalle(null)} className="text-gray-500 hover:text-gray-700 text-sm">{t("Cerrar")}</button>
             </div>
             <div className="space-y-2 text-sm text-gray-700">
-              <p><strong>Fecha:</strong> {new Date(detalle.fecha).toLocaleString()}</p>
-              <p><strong>Estado:</strong> {estadoLabel[detalle.estado]}</p>
-              <p><strong>Cliente:</strong> {detalle.cliente}</p>
-              <p><strong>Direccion:</strong> {detalle.direccion || "N/A"}</p>
-              <p><strong>Motivo:</strong> {detalle.motivo || "N/A"}</p>
-              <p><strong>Resultado:</strong> {detalle.resultado || "N/A"}</p>
-              <p><strong>Comentarios:</strong> {detalle.comentarios || "N/A"}</p>
-              <p><strong>Bodeguero:</strong> {detalle.bodegueroNombre || "N/A"} ({detalle.bodegueroEmail || "N/A"})</p>
-              <p><strong>Cotizacion:</strong> {detalle.cotizacionId ? `#${detalle.cotizacionId} ${detalle.cotizacionCodigo}` : "N/A"}</p>
+              <p><strong>{t("Fecha")}:</strong> {new Date(detalle.fecha).toLocaleString()}</p>
+              <p><strong>{t("Estado")}:</strong> {t(estadoLabel[detalle.estado])}</p>
+              <p><strong>{t("Cliente")}:</strong> {detalle.cliente}</p>
+              <p><strong>{t("Direccion")}:</strong> {detalle.direccion || t("N/A")}</p>
+              <p><strong>{t("Motivo")}:</strong> {detalle.motivo || t("N/A")}</p>
+              <p><strong>{t("Resultado")}:</strong> {detalle.resultado || t("N/A")}</p>
+              <p><strong>{t("Comentarios")}:</strong> {detalle.comentarios || t("N/A")}</p>
+              <p><strong>{t("Bodeguero")}:</strong> {detalle.bodegueroNombre || t("N/A")} ({detalle.bodegueroEmail || t("N/A")})</p>
+              <p><strong>{t("Cotizacion")}:</strong> {detalle.cotizacionId ? `#${detalle.cotizacionId} ${detalle.cotizacionCodigo}` : t("N/A")}</p>
             </div>
             <div className="mt-4 text-right">
               <button
                 onClick={() => setDetalle(null)}
                 className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
               >
-                Cerrar
+                {t("Cerrar")}
               </button>
             </div>
           </div>
@@ -547,14 +559,15 @@ export default function TerrainVisitsPage() {
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-xs uppercase tracking-wide text-[#4B6B8A] font-semibold">Calendario de visitas</p>
-                <h3 className="text-xl font-bold text-[#1A334B]">Entregas y salidas a terreno</h3>
+                <p className="text-xs uppercase tracking-wide text-[#4B6B8A] font-semibold">{t("Calendario de visitas")}</p>
+                <h3 className="text-xl font-bold text-[#1A334B]">{t("Entregas y salidas a terreno")}</h3>
               </div>
-              <button onClick={() => setShowCalendar(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+              <button onClick={() => setShowCalendar(false)} className="text-gray-500 hover:text-gray-700 text-sm">{t("Cerrar")}</button>
             </div>
             <div className="flex-1">
               <BigCalendar
                 localizer={localizer}
+                culture={lang}
                 events={calendarEvents}
                 defaultView="month"
                 views={["month", "week", "day"]}
@@ -562,6 +575,16 @@ export default function TerrainVisitsPage() {
                 endAccessor="end"
                 style={{ height: "100%" }}
                 eventPropGetter={eventStyleGetter}
+                messages={{
+                  month: t("Mes"),
+                  week: t("Semana"),
+                  day: t("Dia"),
+                  today: t("Hoy"),
+                  previous: t("Anterior"),
+                  next: t("Siguiente"),
+                  agenda: t("Agenda"),
+                  showMore: (total) => t("+{total} mas", { total }),
+                }}
                 onSelectEvent={(evt) => {
                   if (evt.resource) setDetalle(evt.resource as VisitaTerreno);
                 }}
@@ -575,12 +598,12 @@ export default function TerrainVisitsPage() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-[#1A334B]">Nueva visita a terreno</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">Cerrar</button>
+              <h3 className="text-xl font-bold text-[#1A334B]">{t("Nueva visita a terreno")}</h3>
+              <button onClick={() => setShowForm(false)} className="text-gray-500 hover:text-gray-700 text-sm">{t("Cerrar")}</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1">
-                Fecha y hora
+                {t("Fecha y hora")}
                 <input
                   type="datetime-local"
                   value={nueva.fecha}
@@ -589,49 +612,49 @@ export default function TerrainVisitsPage() {
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1">
-                Estado
+                {t("Estado")}
                 <select
                   value={nueva.estado}
                   onChange={(e) => setNueva({ ...nueva, estado: e.target.value as VisitaEstado })}
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm"
                 >
                   {Object.keys(estadoLabel).map((e) => (
-                    <option key={e} value={e}>{estadoLabel[e as VisitaEstado]}</option>
+                    <option key={e} value={e}>{t(estadoLabel[e as VisitaEstado])}</option>
                   ))}
                 </select>
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1 md:col-span-2">
-                Cliente
+                {t("Cliente")}
                 <input
                   type="text"
                   value={nueva.cliente}
                   onChange={(e) => setNueva({ ...nueva, cliente: e.target.value })}
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm"
-                  placeholder="Nombre del cliente"
+                  placeholder={t("Nombre del cliente")}
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1 md:col-span-2">
-                Direccion
+                {t("Direccion")}
                 <input
                   type="text"
                   value={nueva.direccion}
                   onChange={(e) => setNueva({ ...nueva, direccion: e.target.value })}
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm"
-                  placeholder="Direccion exacta"
+                  placeholder={t("Direccion exacta")}
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1 md:col-span-2">
-                Motivo
+                {t("Motivo")}
                 <input
                   type="text"
                   value={nueva.motivo}
                   onChange={(e) => setNueva({ ...nueva, motivo: e.target.value })}
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm"
-                  placeholder="Entrega, revision, etc"
+                  placeholder={t("Entrega, revision, etc")}
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1 md:col-span-2">
-                Resultado / Comentarios
+                {t("Resultado / Comentarios")}
                 <textarea
                   value={nueva.resultado}
                   onChange={(e) => setNueva({ ...nueva, resultado: e.target.value })}
@@ -640,7 +663,7 @@ export default function TerrainVisitsPage() {
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1">
-                Bodeguero email
+                {t("Bodeguero email")}
                 <input
                   type="email"
                   value={nueva.bodegueroEmail}
@@ -650,13 +673,13 @@ export default function TerrainVisitsPage() {
                 />
               </label>
               <label className="text-xs font-semibold text-[#1A334B] flex flex-col gap-1">
-                Cotizacion ID (opcional)
+                {t("Cotizacion ID (opcional)")}
                 <input
                   type="number"
                   value={nueva.cotizacionId}
                   onChange={(e) => setNueva({ ...nueva, cotizacionId: e.target.value })}
                   className="border border-[#D9E7F5] rounded-lg px-3 py-2 text-sm"
-                  placeholder="Ej: 205"
+                  placeholder={t("Ej: 205")}
                 />
               </label>
             </div>
@@ -665,13 +688,13 @@ export default function TerrainVisitsPage() {
                 onClick={() => setShowForm(false)}
                 className="px-4 py-2 text-sm font-semibold rounded-lg border border-[#D9E7F5] text-[#1A334B] hover:bg-[#F4F8FD]"
               >
-                Cancelar
+                {t("Cancelar")}
               </button>
               <button
                 onClick={handleCrear}
                 className="px-4 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-[#1A6CD3] to-[#0E4B8F] text-white"
               >
-                Guardar
+                {t("Guardar")}
               </button>
             </div>
           </div>
@@ -680,3 +703,4 @@ export default function TerrainVisitsPage() {
     </MainLayout>
   );
 }
+
